@@ -1,2 +1,7 @@
 # kielipankki-rahti
-Configuration and documentation for Kielipankki's Rahti deployments
+
+## API
+
+services/nginx/nginx.conf määrittelee, mitkä polut lähetetään millekin kontille, ja konttien sisällä Flask-routet määrittelevät endpointit.
+
+[API-dokumentaatio](api.md)
