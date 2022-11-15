@@ -2,6 +2,6 @@
 
 ## API
 
-services/nginx/nginx.conf määrittelee, mitkä polut lähetetään millekin kontille, ja konttien sisällä Flask-routet määrittelevät endpointit.
+The webserver configuration in services/nginx/nginx.conf defines which paths are routed to which containers, and each container has Flask routes which define the endpoints.
 
-[API-dokumentaatio](API.md)
+[API documentation](API.md)
