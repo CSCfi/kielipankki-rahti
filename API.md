@@ -2,35 +2,33 @@
 
 ## Text endpoints
 
-The following endpoints accept running text as the data payload, and directly return a json response. Eg:
+The following endpoints accept running text as the data payload, and directly return a json response, which represents a list of sentences, with each sentence comprising a list of tokens. The tokens are the direct output of the underlying tools, but a more structured format is planned. Eg:
 
 	$ curl --data "Voi voi olla." kielipankki.rahtiapp.fi/text/fi/postag | jq
-	{
-		"postagged": [
-			[
-				[
-					"Voi",
-					"voi",
-					"[POS=PARTICLE]|[SUBCAT=INTERJECTION]"
-				],
-				[
-					"voi",
-					"voida",
-					"[POS=VERB]|[VOICE=ACT]|[MOOD=INDV]|[TENSE=PRESENT]|[PERS=SG3]"
-				],
-				[
-					"olla",
-					"olla",
-					"[POS=VERB]|[VOICE=ACT]|[INF=A]|[CASE=LAT]"
-				],
-				[
-					".",
-					".",
-					"[POS=PUNCTUATION]"
-				]
-			]
-		]
-	}
+	[
+	  [
+	    [
+	      "Voi",
+	      "voi",
+	      "[POS=PARTICLE]|[SUBCAT=INTERJECTION]"
+	    ],
+	    [
+	      "voi",
+	      "voida",
+	      "[POS=VERB]|[VOICE=ACT]|[MOOD=INDV]|[TENSE=PRESENT]|[PERS=SG3]"
+	    ],
+	    [
+	      "olla",
+	      "olla",
+	      "[POS=VERB]|[VOICE=ACT]|[INF=A]|[CASE=LAT]"
+	    ],
+	    [
+	      ".",
+	      ".",
+	      "[POS=PUNCTUATION]"
+	    ]
+	  ]
+	]
 
 
 #### `/text/fi/postag` (POST)
