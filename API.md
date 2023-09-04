@@ -107,3 +107,31 @@ Endpoints for aligning a known transcript with an audio to obtain timestamps.
 Submit a form with `audio` and `transcript` keys.
 
 #### `/audio/align/fi/query_job`
+
+## Health checks and tests
+
+The following endpoints under `kielipankki.rahtiapp.fi` may be used as health checks for their respective services:
+
+* `/health` (the web server)
+* `/audio/asr/fi/health`
+* `/audio/align/fi/health`
+* `/text/fi/health`
+* `/text/fi/parse/health`
+
+These should all return a `200` code when healthy in less than one second. With one exception, they will also return a JSON response with the field `status` having the value `UP` when healthy, and `DOWN` when unhealthy. They may optionally also contain a `checks` field, the value of which is another JSON object with name-status keypairs. The exception is `/text/fi/parse/health`, which will only return a `200` response with a nonmeaningful text response.
+
+Example:
+
+`{"checks":{"redis":"UP"},"status":"UP"}`
+
+The following endpoints perform more thorough tests of their functioning. These tests should not be called too frequently (eg. once a day is ok, or more often if the service has recently failed).
+
+* `/audio/asr/fi/self_test`
+* `/text/fi/self_test`
+
+Example:
+
+```bash
+$ curl kielipankki.rahtiapp.fi/audio/asr/fi/self_test
+{"checks":{"decoding":"UP","query_response":"UP","redis":"UP","submit_file":"UP"},"status":"UP"}
+```
