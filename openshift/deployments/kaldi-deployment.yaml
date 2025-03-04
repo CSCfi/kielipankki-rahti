@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    io.kompose.service: kaldi-serve
+  name: kaldi-serve
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      io.kompose.service: kaldi-serve
+f  template:
+    metadata:
+      annotations:
+      labels:
+        io.kompose.service: kaldi-serve
+    spec:
+      initContainers:
+      - name: init-container
+        image: image-registry.apps.2.rahti.csc.fi/kielipankki-services/init_container:latest
+        command: ['sh', '-c', 'curl -o /tmp/model-fi.zip https://a3s.fi/kielipankki_services_data/model-fi.zip && unzip /tmp/model-fi.zip -d /tmp && mv /tmp/model-fi /data/']
+        volumeMounts:
+        - mountPath: /data
+          name: model-data
+      containers:
+        - name: kaldi-serve
+          resources:
+            limits:
+              memory: 4000Mi
+            requests:
+              memory: 1000Mi
+          args:
+            - /home/app/kaldi-serve-init
+          env: []
+          image: image-registry.apps.2.rahti.csc.fi/kielipankki-services/kaldi-serve:latest
+          volumeMounts:
+            - mountPath: /data
+              name: model-data
+          ports:
+            - containerPort: 5002
+      restartPolicy: Always
+      volumes:
+        - name: model-data
+          emptyDir:
+            sizeLimit: 6Gi
+status: {}

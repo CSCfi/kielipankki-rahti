@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: nginx
+  template:
+    metadata:
+      labels:
+        io.kompose.service: nginx
+    spec:
+      containers:
+        - image: image-registry.apps.2.rahti.csc.fi/kielipankki-services/nginx:latest
+          name: nginx
+          ports:
+            - containerPort: 1337
+          resources: {}
+      restartPolicy: Always
+status: {}

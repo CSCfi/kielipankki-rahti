@@ -1,0 +1,18 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: imagestreams-template
+parameters:
+  - name: IMAGE_NAME
+    required: true
+  - name: IMAGE_NAMESPACE
+    value: kielipankki-service-dev
+  - name: IMAGE_TAG
+    value: "latest"
+
+objects:
+  - apiVersion: image.openshift.io/v1
+    kind: ImageStream
+    metadata:
+      name: ${IMAGE_NAME}
+

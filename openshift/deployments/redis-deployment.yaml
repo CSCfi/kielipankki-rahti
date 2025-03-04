@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: redis
+  template:
+    metadata:
+      labels:
+        io.kompose.service: redis
+    spec:
+      containers:
+        - image: image-registry.apps.2.rahti.csc.fi/kielipankki-services/redis:latest
+          name: redis
+          ports:
+            - containerPort: 6379
+          resources: {}
+      restartPolicy: Always
+status: {}

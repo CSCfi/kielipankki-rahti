@@ -1,0 +1,25 @@
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: finnish-forced-align
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        io.kompose.service: finnish-forced-align
+    template:
+      metadata:
+        labels:
+          io.kompose.service: finnish-forced-align
+      spec:
+        containers:
+        - image: image-registry.apps.2.rahti.csc.fi/kielipankki-services/finnish-forced-align:latest
+          name: finnish-forced-align
+          ports:
+          - containerPort: 5003
+          resources: {}
+        restartPolicy: Always
+kind: List
+metadata: {}

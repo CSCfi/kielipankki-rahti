@@ -1,0 +1,15 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: init-container-build
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+  output:
+    to:
+      kind: ImageStreamTag
+      name: 'init_container:latest'
+  resources: {}
+  revision: {}

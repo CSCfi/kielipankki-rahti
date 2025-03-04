@@ -1,0 +1,17 @@
+apiVersion: v1
+items:
+- apiVersion: build.openshift.io/v1
+  kind: BuildConfig
+  metadata:
+    name: neuralparse-build
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: neuralparse:latest
+    source:
+      type: Binary
+    strategy:
+      type: Docker
+kind: List
+metadata: {}

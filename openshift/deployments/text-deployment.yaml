@@ -1,0 +1,32 @@
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: text
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        io.kompose.service: text
+    template:
+      metadata:
+        labels:
+          io.kompose.service: text
+      spec:
+        containers:
+        - image: image-registry.apps.2.rahti.csc.fi/kielipankki-services/text:latest
+          name: text
+          ports:
+          - containerPort: 5001
+          resources: {}
+          command:
+            - gunicorn
+          args:
+            - '--bind'
+            - '0.0.0.0:5001'
+            - 'manage:app'
+            - '--timeout 600'
+        restartPolicy: Always
+kind: List
+metadata: {}

@@ -1,0 +1,25 @@
+# This is a sample model specification file which can be loaded in kaldi-serve
+# Here we specify a list of model with extra properties like model name,
+# language code etc.
+
+# Compulsory keys are `name', `language' (both used to identify a loaded model)
+# and `path'.
+[[model]]
+# name = "ASpIRE"
+# language_code = "en"
+# path = "./model"
+name = "aalto-asr"
+language_code = "fi"
+path = "/data/model-fi"
+#path = "./model-fi"
+# A few optional decoder related parameters. Default value listed in comment at
+# the end. Most of the viterbi params can be tuned to trade-off speed vs
+# accuracy.
+n_decoders = 20 # 1
+beam = 13.0 # 20? # 13.0 # 7.0
+min_active = 200 # 200
+max_active = 7000 # 7000 # 3000
+lattice_beam = 6.0 # 6.0 # 3.0
+acoustic_scale = 1.0 # 0.1? # 1.0
+frame_subsampling_factor = 3 # 3
+silence_weight = 1.0

@@ -1,0 +1,20 @@
+apiVersion: v1
+items:
+- apiVersion: build.openshift.io/v1
+  kind: BuildConfig
+  metadata:
+    name: text-build
+  spec:
+    resources:
+      limits:
+        memory: "2048Mi"
+    output:
+      to:
+        kind: ImageStreamTag
+        name: text:latest
+    source:
+      type: Binary
+    strategy:
+      type: Docker
+kind: List
+metadata: {}

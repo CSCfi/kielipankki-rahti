@@ -1,0 +1,26 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: buildconfig-template
+parameters:
+  - name: IMAGE_NAME
+    required: true
+  - name: IMAGE_NAMESPACE
+    value: kielipankki-service-dev
+  - name: IMAGE_TAG
+    value: "latest"
+
+objects:
+  - apiVersion: build.openshift.io/v1
+    kind: BuildConfig
+    metadata:
+      name: ${IMAGE_NAME}-build
+    spec:
+      source:
+        type: Binary
+      strategy:
+        type: Docker
+      output:
+        to:
+          kind: ImageStreamTag
+          name: ${IMAGE_NAME}:${IMAGE_TAG}

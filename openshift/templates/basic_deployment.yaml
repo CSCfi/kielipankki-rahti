@@ -1,0 +1,32 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: service-template
+parameters:
+  - name: SERVICE_NAME
+    required: true
+  - name: SERVICE_PORT
+    required: true
+
+objects:
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: ${SERVICE_NAME}
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          io.kompose.service: ${SERVICE_NAME}
+      template:
+        metadata:
+          labels:
+            io.kompose.service: ${SERVICE_NAME}
+        spec:
+          containers:
+            - image: image-registry.apps.2.rahti.csc.fi/kielipankki-services/${SERVICE_NAME}:latest
+              name: ${SERVICE_NAME}
+              ports:
+                - containerPort: ${{SERVICE_PORT}}
+              resources: {}
+          restartPolicy: Always

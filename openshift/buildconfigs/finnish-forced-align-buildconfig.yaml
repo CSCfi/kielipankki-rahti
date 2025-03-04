@@ -1,0 +1,13 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: finnish-forced-align-build
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+  output:
+    to:
+      kind: ImageStreamTag
+      name: 'finnish-forced-align:latest'

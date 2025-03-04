@@ -1,0 +1,18 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Service
+  labels:
+    io.kompose.service: text
+  metadata:
+    name: text
+  namespace: kielipankki-services
+  spec:
+    ports:
+    - port: 5001
+      protocol: TCP
+      targetPort: 5001
+    selector:
+      io.kompose.service: text
+kind: List
+metadata: {}

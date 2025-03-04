@@ -1,0 +1,27 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: service-template
+parameters:
+  - name: SERVICE_NAME
+    required: true
+  - name: SERVICE_PORT
+    required: true
+  - name: NAMESPACE
+    value: kielipankki-services
+
+objects:
+  - kind: Service
+    apiVersion: v1
+    metadata:
+      name: ${SERVICE_NAME}
+    namespace: ${NAMESPACE}
+    labels:
+      io.kompose.service: ${SERVICE_NAME}
+    spec:
+      ports:
+        - protocol: TCP
+          port: ${{SERVICE_PORT}}
+          targetPort: ${{SERVICE_PORT}}
+      selector:
+        io.kompose.service: ${SERVICE_NAME}

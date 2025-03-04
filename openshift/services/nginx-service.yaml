@@ -1,0 +1,19 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: nginx
+namespace: kielipankki-services
+labels:
+  io.kompose.service: nginx
+spec:
+  ports:
+    - name: external
+      protocol: TCP
+      port: 80
+      targetPort: 1337
+    - name: internal
+      protocol: TCP
+      port: 1337
+      targetPort: 1337
+  selector:
+    io.kompose.service: nginx
