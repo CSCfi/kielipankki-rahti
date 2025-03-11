@@ -9,7 +9,7 @@ spec:
   selector:
     matchLabels:
       io.kompose.service: kaldi-serve
-f  template:
+  template:
     metadata:
       annotations:
       labels:
