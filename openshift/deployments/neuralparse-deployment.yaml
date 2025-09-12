@@ -23,7 +23,7 @@ items:
           - containerPort: 7689
           resources:
             limits:
-              memory: 4000Mi
+              memory: 8000Mi
             requests:
               memory: 2000Mi
         restartPolicy: Always
