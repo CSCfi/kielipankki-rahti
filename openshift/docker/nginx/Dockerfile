@@ -1,8 +1,11 @@
 FROM registry.access.redhat.com/ubi8/nginx-122
 
 ADD nginx.conf "${NGINX_CONF_PATH}"
-#ADD site.conf "${NGINX_DEFAULT_CONF_PATH}"
-#ADD upstream.conf "${NGINX_CONFIGURATION_PATH}"
+COPY start.sh /opt/app-root/start.sh
 
-# Run script uses standard ways to run the application
-CMD nginx -g "daemon off;"
+# start.sh writes the resolver configuration at runtime as an arbitrary user.
+USER 0
+RUN chmod +x /opt/app-root/start.sh && chmod g+rwX "${NGINX_CONFIGURATION_PATH}"
+USER 1001
+
+CMD ["/opt/app-root/start.sh"]

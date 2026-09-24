@@ -1,0 +1,55 @@
+{
+  "result": {
+    "done": true,
+    "id": "3f0871fd-aa57-4486-be7b-e6b30fbbd7fc",
+    "metadata": {
+      "version": "KP 0.1"
+    },
+    "processing_finished": 1790153503.141,
+    "processing_started": 1790153502.559,
+    "result": {
+      "sections": [
+        {
+          "end": 3.986,
+          "start": 0.0,
+          "transcript": "nyt on tarkoitus tunnistaa puhetta",
+          "words": [
+            {
+              "end": 0.63,
+              "start": 0.36,
+              "word": "nyt"
+            },
+            {
+              "end": 0.75,
+              "start": 0.63,
+              "word": "on"
+            },
+            {
+              "end": 1.53,
+              "start": 0.75,
+              "word": "tarkoitus"
+            },
+            {
+              "end": 2.34,
+              "start": 1.56,
+              "word": "tunnistaa"
+            },
+            {
+              "end": 3.12,
+              "start": 2.46,
+              "word": "puhetta"
+            }
+          ]
+        }
+      ],
+      "speakers": {
+        "S0": {}
+      }
+    },
+    "status": "done"
+  },
+  "submit": {
+    "file": "puhetta.mp3",
+    "jobid": "3f0871fd-aa57-4486-be7b-e6b30fbbd7fc"
+  }
+}

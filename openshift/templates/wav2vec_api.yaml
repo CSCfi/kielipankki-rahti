@@ -1,0 +1,84 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: wav2vec-api-template
+  annotations:
+    description: >-
+      HTTP API for the /audio/asr and /audio/align paths, running the wav2vec
+      image with ROLE=api. It holds no model; it converts uploads and puts
+      jobs on the per-language Redis queues.
+parameters:
+  - name: IMAGE_NAMESPACE
+    description: Project whose image registry holds the wav2vec image
+    value: kielipankki-services
+  - name: IMAGE_TAG
+    value: latest
+  - name: REPLICAS
+    value: "1"
+  - name: LANGUAGES
+    description: Comma separated language codes the API accepts
+    value: fi
+  - name: PUBLIC_BASE_URL
+    description: Base URL the self test calls itself through
+    value: http://nginx:1337
+
+objects:
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: asr-api
+      labels:
+        io.kompose.service: asr-api
+    spec:
+      replicas: ${{REPLICAS}}
+      selector:
+        matchLabels:
+          io.kompose.service: asr-api
+      template:
+        metadata:
+          labels:
+            io.kompose.service: asr-api
+        spec:
+          enableServiceLinks: false
+          containers:
+            - name: asr-api
+              image: image-registry.apps.2.rahti.csc.fi/${IMAGE_NAMESPACE}/wav2vec:${IMAGE_TAG}
+              env:
+                - name: ROLE
+                  value: api
+                - name: ASR_LANGUAGES
+                  value: ${LANGUAGES}
+                - name: ASR_REDIS_HOST
+                  value: redis
+                - name: PUBLIC_BASE_URL
+                  value: ${PUBLIC_BASE_URL}
+              ports:
+                - containerPort: 5000
+              readinessProbe:
+                httpGet:
+                  path: /audio/asr/health
+                  port: 5000
+                initialDelaySeconds: 5
+                periodSeconds: 10
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 1Gi
+          restartPolicy: Always
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: asr-api
+      labels:
+        io.kompose.service: asr-api
+    spec:
+      ports:
+        - protocol: TCP
+          port: 5000
+          targetPort: 5000
+      selector:
+        io.kompose.service: asr-api

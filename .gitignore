@@ -127,3 +127,12 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Model zips staged for upload to Allas
+/*.zip
+
+# Audio for the live-service tests and the image's self test is kept locally
+/test/*.wav
+/test/*.mp3
+/openshift/docker/wav2vec/test/*/*.wav
+/openshift/docker/wav2vec/test/*/*.mp3

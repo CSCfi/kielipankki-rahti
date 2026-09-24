@@ -1,0 +1,414 @@
+File type = "ooTextFile"
+Object class = "TextGrid"
+
+xmin = 0.000000
+xmax = 36.670000
+tiers? <exists>
+size = 1
+item []:
+    item [1]:
+        class = "IntervalTier"
+        name = "words"
+        xmin = 0.000000
+        xmax = 36.670000
+        intervals: size = 100
+        intervals [1]:
+            xmin = 0.000000
+            xmax = 0.610000
+            text = "pohjantuuli"
+        intervals [2]:
+            xmin = 0.610000
+            xmax = 0.710000
+            text = "ja"
+        intervals [3]:
+            xmin = 0.710000
+            xmax = 1.330000
+            text = "aurinko"
+        intervals [4]:
+            xmin = 1.330000
+            xmax = 2.370000
+            text = ""
+        intervals [5]:
+            xmin = 2.370000
+            xmax = 2.970000
+            text = "pohjantuuli"
+        intervals [6]:
+            xmin = 2.970000
+            xmax = 3.070000
+            text = "ja"
+        intervals [7]:
+            xmin = 3.070000
+            xmax = 3.080000
+            text = ""
+        intervals [8]:
+            xmin = 3.080000
+            xmax = 3.530000
+            text = "aurinko"
+        intervals [9]:
+            xmin = 3.530000
+            xmax = 4.090000
+            text = "väittelivät"
+        intervals [10]:
+            xmin = 4.090000
+            xmax = 4.470000
+            text = "kummalla"
+        intervals [11]:
+            xmin = 4.470000
+            xmax = 4.710000
+            text = "olisi"
+        intervals [12]:
+            xmin = 4.710000
+            xmax = 5.030000
+            text = "enemmän"
+        intervals [13]:
+            xmin = 5.030000
+            xmax = 5.590000
+            text = "voimaa"
+        intervals [14]:
+            xmin = 5.590000
+            xmax = 5.870000
+            text = ""
+        intervals [15]:
+            xmin = 5.870000
+            xmax = 6.060000
+            text = "kun"
+        intervals [16]:
+            xmin = 6.060000
+            xmax = 6.180000
+            text = "he"
+        intervals [17]:
+            xmin = 6.180000
+            xmax = 6.560000
+            text = "samalla"
+        intervals [18]:
+            xmin = 6.560000
+            xmax = 6.980000
+            text = "näkivät"
+        intervals [19]:
+            xmin = 6.980000
+            xmax = 6.990000
+            text = ""
+        intervals [20]:
+            xmin = 6.990000
+            xmax = 7.660000
+            text = "kulkijan"
+        intervals [21]:
+            xmin = 7.660000
+            xmax = 8.030000
+            text = "jolla"
+        intervals [22]:
+            xmin = 8.030000
+            xmax = 8.200000
+            text = "oli"
+        intervals [23]:
+            xmin = 8.200000
+            xmax = 8.570000
+            text = "yllään"
+        intervals [24]:
+            xmin = 8.570000
+            xmax = 8.580000
+            text = ""
+        intervals [25]:
+            xmin = 8.580000
+            xmax = 8.990000
+            text = "lämmin"
+        intervals [26]:
+            xmin = 8.990000
+            xmax = 9.540000
+            text = "takki"
+        intervals [27]:
+            xmin = 9.540000
+            xmax = 10.140000
+            text = ""
+        intervals [28]:
+            xmin = 10.140000
+            xmax = 10.610000
+            text = "silloin"
+        intervals [29]:
+            xmin = 10.610000
+            xmax = 10.710000
+            text = "he"
+        intervals [30]:
+            xmin = 10.710000
+            xmax = 11.180000
+            text = "sopivat"
+        intervals [31]:
+            xmin = 11.180000
+            xmax = 11.400000
+            text = "että"
+        intervals [32]:
+            xmin = 11.400000
+            xmax = 11.560000
+            text = "se"
+        intervals [33]:
+            xmin = 11.560000
+            xmax = 11.700000
+            text = "on"
+        intervals [34]:
+            xmin = 11.700000
+            xmax = 12.530000
+            text = "voimakkaampi"
+        intervals [35]:
+            xmin = 12.530000
+            xmax = 12.610000
+            text = ""
+        intervals [36]:
+            xmin = 12.610000
+            xmax = 12.870000
+            text = "joka"
+        intervals [37]:
+            xmin = 12.870000
+            xmax = 13.410000
+            text = "nopeammin"
+        intervals [38]:
+            xmin = 13.410000
+            xmax = 13.620000
+            text = "saa"
+        intervals [39]:
+            xmin = 13.620000
+            xmax = 14.080000
+            text = "kulkijan"
+        intervals [40]:
+            xmin = 14.080000
+            xmax = 14.560000
+            text = "riisumaan"
+        intervals [41]:
+            xmin = 14.560000
+            xmax = 15.160000
+            text = "takkinsa"
+        intervals [42]:
+            xmin = 15.160000
+            xmax = 16.170000
+            text = ""
+        intervals [43]:
+            xmin = 16.170000
+            xmax = 16.780000
+            text = "pohjantuuli"
+        intervals [44]:
+            xmin = 16.780000
+            xmax = 17.090000
+            text = "alkoi"
+        intervals [45]:
+            xmin = 17.090000
+            xmax = 17.100000
+            text = ""
+        intervals [46]:
+            xmin = 17.100000
+            xmax = 17.540000
+            text = "puhaltaa"
+        intervals [47]:
+            xmin = 17.540000
+            xmax = 17.770000
+            text = "niin"
+        intervals [48]:
+            xmin = 17.770000
+            xmax = 17.980000
+            text = "että"
+        intervals [49]:
+            xmin = 17.980000
+            xmax = 17.990000
+            text = ""
+        intervals [50]:
+            xmin = 17.990000
+            xmax = 18.640000
+            text = "viuhui"
+        intervals [51]:
+            xmin = 18.640000
+            xmax = 19.090000
+            text = ""
+        intervals [52]:
+            xmin = 19.090000
+            xmax = 19.370000
+            text = "mutta"
+        intervals [53]:
+            xmin = 19.370000
+            xmax = 19.620000
+            text = "mitä"
+        intervals [54]:
+            xmin = 19.620000
+            xmax = 20.040000
+            text = "kovempaa"
+        intervals [55]:
+            xmin = 20.040000
+            xmax = 20.120000
+            text = ""
+        intervals [56]:
+            xmin = 20.120000
+            xmax = 20.230000
+            text = "se"
+        intervals [57]:
+            xmin = 20.230000
+            xmax = 20.820000
+            text = "puhalsi"
+        intervals [58]:
+            xmin = 20.820000
+            xmax = 20.920000
+            text = ""
+        intervals [59]:
+            xmin = 20.920000
+            xmax = 21.230000
+            text = "sitä"
+        intervals [60]:
+            xmin = 21.230000
+            xmax = 21.250000
+            text = ""
+        intervals [61]:
+            xmin = 21.250000
+            xmax = 21.750000
+            text = "tiukemmin"
+        intervals [62]:
+            xmin = 21.750000
+            xmax = 21.760000
+            text = ""
+        intervals [63]:
+            xmin = 21.760000
+            xmax = 22.030000
+            text = "kääri"
+        intervals [64]:
+            xmin = 22.030000
+            xmax = 22.310000
+            text = "mies"
+        intervals [65]:
+            xmin = 22.310000
+            xmax = 22.650000
+            text = "takin"
+        intervals [66]:
+            xmin = 22.650000
+            xmax = 23.390000
+            text = "ympärilleen"
+        intervals [67]:
+            xmin = 23.390000
+            xmax = 23.660000
+            text = ""
+        intervals [68]:
+            xmin = 23.660000
+            xmax = 23.770000
+            text = "ja"
+        intervals [69]:
+            xmin = 23.770000
+            xmax = 24.160000
+            text = "viimein"
+        intervals [70]:
+            xmin = 24.160000
+            xmax = 24.450000
+            text = "tuuli"
+        intervals [71]:
+            xmin = 24.450000
+            xmax = 24.840000
+            text = "luopui"
+        intervals [72]:
+            xmin = 24.840000
+            xmax = 25.120000
+            text = "koko"
+        intervals [73]:
+            xmin = 25.120000
+            xmax = 25.780000
+            text = "hommasta"
+        intervals [74]:
+            xmin = 25.780000
+            xmax = 26.360000
+            text = ""
+        intervals [75]:
+            xmin = 26.360000
+            xmax = 26.830000
+            text = "silloin"
+        intervals [76]:
+            xmin = 26.830000
+            xmax = 27.180000
+            text = "alkoi"
+        intervals [77]:
+            xmin = 27.180000
+            xmax = 27.620000
+            text = "aurinko"
+        intervals [78]:
+            xmin = 27.620000
+            xmax = 28.030000
+            text = "loistaa"
+        intervals [79]:
+            xmin = 28.030000
+            xmax = 28.830000
+            text = "lämpimästi"
+        intervals [80]:
+            xmin = 28.830000
+            xmax = 29.100000
+            text = ""
+        intervals [81]:
+            xmin = 29.100000
+            xmax = 29.390000
+            text = "eikä"
+        intervals [82]:
+            xmin = 29.390000
+            xmax = 30.060000
+            text = "aikaakaan"
+        intervals [83]:
+            xmin = 30.060000
+            xmax = 30.200000
+            text = "niin"
+        intervals [84]:
+            xmin = 30.200000
+            xmax = 30.630000
+            text = "kulkija"
+        intervals [85]:
+            xmin = 30.630000
+            xmax = 30.990000
+            text = "riisui"
+        intervals [86]:
+            xmin = 30.990000
+            xmax = 31.710000
+            text = "manttelinsa"
+        intervals [87]:
+            xmin = 31.710000
+            xmax = 32.490000
+            text = ""
+        intervals [88]:
+            xmin = 32.490000
+            xmax = 32.750000
+            text = "niin"
+        intervals [89]:
+            xmin = 32.750000
+            xmax = 32.940000
+            text = "oli"
+        intervals [90]:
+            xmin = 32.940000
+            xmax = 33.300000
+            text = "tuulen"
+        intervals [91]:
+            xmin = 33.300000
+            xmax = 33.650000
+            text = "pakko"
+        intervals [92]:
+            xmin = 33.650000
+            xmax = 34.150000
+            text = "myöntää"
+        intervals [93]:
+            xmin = 34.150000
+            xmax = 34.420000
+            text = "että"
+        intervals [94]:
+            xmin = 34.420000
+            xmax = 34.430000
+            text = ""
+        intervals [95]:
+            xmin = 34.430000
+            xmax = 34.890000
+            text = "aurinko"
+        intervals [96]:
+            xmin = 34.890000
+            xmax = 35.100000
+            text = "oli"
+        intervals [97]:
+            xmin = 35.100000
+            xmax = 35.320000
+            text = "kuin"
+        intervals [98]:
+            xmin = 35.320000
+            xmax = 35.680000
+            text = "olikin"
+        intervals [99]:
+            xmin = 35.680000
+            xmax = 35.990000
+            text = "heistä"
+        intervals [100]:
+            xmin = 35.990000
+            xmax = 36.670000
+            text = "vahvempi"

@@ -7,6 +7,9 @@ parameters:
     required: true
   - name: SERVICE_PORT
     required: true
+  - name: IMAGE_NAMESPACE
+    description: Project whose image registry holds the image
+    value: kielipankki-services
 
 objects:
   - apiVersion: apps/v1
@@ -24,7 +27,7 @@ objects:
             io.kompose.service: ${SERVICE_NAME}
         spec:
           containers:
-            - image: image-registry.apps.2.rahti.csc.fi/kielipankki-services/${SERVICE_NAME}:latest
+            - image: image-registry.apps.2.rahti.csc.fi/${IMAGE_NAMESPACE}/${SERVICE_NAME}:latest
               name: ${SERVICE_NAME}
               ports:
                 - containerPort: ${{SERVICE_PORT}}

@@ -1,0 +1,124 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: wav2vec-worker-template
+  annotations:
+    description: >-
+      Recognition and alignment worker for one language, running the wav2vec
+      image with ROLE=worker. An init container downloads the model zip from
+      MODEL_URL into an emptyDir; the worker loads it once and consumes the
+      Redis list asr:<LANG>.
+parameters:
+  - name: IMAGE_NAMESPACE
+    description: Project whose image registry holds the wav2vec and init_container images
+    value: kielipankki-services
+  - name: IMAGE_TAG
+    value: latest
+  - name: LANG
+    description: Language code as it appears in the public paths and the queue name
+    required: true
+  - name: NAME
+    description: Deployment name; must be lowercase, so codes such as sv-FI need it set explicitly
+    value: wav2vec-fi
+  - name: MODEL_URL
+    description: Public URL of a zip holding a Hugging Face model directory
+    required: true
+  - name: REPLICAS
+    value: "1"
+  - name: CPU_REQUEST
+    value: "2"
+  - name: CPU_LIMIT
+    value: "4"
+  - name: MEMORY_REQUEST
+    value: 2Gi
+  - name: MEMORY_LIMIT
+    value: 5Gi
+  - name: MODEL_VOLUME_SIZE
+    description: emptyDir size limit; must hold the zip and the unpacked model at once
+    value: 4Gi
+  - name: THREADS
+    description: Torch threads, normally equal to CPU_LIMIT
+    value: "4"
+  - name: QUANTIZE
+    description: none or int8
+    value: int8
+
+objects:
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: ${NAME}
+      labels:
+        io.kompose.service: ${NAME}
+    spec:
+      replicas: ${{REPLICAS}}
+      # A rolling update would need room for two workers at once.
+      strategy:
+        type: Recreate
+      selector:
+        matchLabels:
+          io.kompose.service: ${NAME}
+      template:
+        metadata:
+          labels:
+            io.kompose.service: ${NAME}
+        spec:
+          enableServiceLinks: false
+          # Let a job in flight finish before the pod is killed.
+          terminationGracePeriodSeconds: 600
+          initContainers:
+            - name: fetch-model
+              image: image-registry.apps.2.rahti.csc.fi/${IMAGE_NAMESPACE}/init_container:${IMAGE_TAG}
+              # Whatever the zip's layout, the directory holding the model
+              # (kielipankki.json from the packaging tools, or config.json of
+              # a plain Hugging Face checkpoint) ends up at /data/model.
+              command:
+                - sh
+                - -c
+                - >-
+                  set -e;
+                  curl -fsSL -o /data/model.zip "$MODEL_URL";
+                  unzip -q /data/model.zip -d /data/unzipped;
+                  rm /data/model.zip;
+                  dir=$(find /data/unzipped \( -name kielipankki.json -o -name config.json \) -printf '%h\n' | head -n 1);
+                  if [ -z "$dir" ]; then echo "no model directory found in $MODEL_URL" >&2; exit 1; fi;
+                  mv "$dir" /data/model;
+                  rm -rf /data/unzipped;
+                  ls -l /data/model
+              env:
+                - name: MODEL_URL
+                  value: ${MODEL_URL}
+              volumeMounts:
+                - mountPath: /data
+                  name: model-data
+          containers:
+            - name: wav2vec
+              image: image-registry.apps.2.rahti.csc.fi/${IMAGE_NAMESPACE}/wav2vec:${IMAGE_TAG}
+              env:
+                - name: ROLE
+                  value: worker
+                - name: ASR_LANG
+                  value: ${LANG}
+                - name: ASR_MODEL_DIR
+                  value: /data/model
+                - name: ASR_QUANTIZE
+                  value: ${QUANTIZE}
+                - name: ASR_THREADS
+                  value: ${THREADS}
+                - name: ASR_REDIS_HOST
+                  value: redis
+              volumeMounts:
+                - mountPath: /data
+                  name: model-data
+              resources:
+                requests:
+                  cpu: ${CPU_REQUEST}
+                  memory: ${MEMORY_REQUEST}
+                limits:
+                  cpu: ${CPU_LIMIT}
+                  memory: ${MEMORY_LIMIT}
+          restartPolicy: Always
+          volumes:
+            - name: model-data
+              emptyDir:
+                sizeLimit: ${MODEL_VOLUME_SIZE}

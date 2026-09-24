@@ -1,0 +1,19 @@
+{
+  "acoustic_scale": 1.0,
+  "beam": 13.0,
+  "frame_subsampling_factor": 3,
+  "language_code": "fi",
+  "lattice_beam": 6.0,
+  "max_active": 7000,
+  "min_active": 200,
+  "n_decoders": 20,
+  "name": "aalto-asr",
+  "path": "/data/model-fi",
+  "responses": [
+    {
+      "confidence": 0.9617282596864039,
+      "transcript": "nyt on tarkoitus tunnistaa puhetta"
+    }
+  ],
+  "silence_weight": 1.0
+}

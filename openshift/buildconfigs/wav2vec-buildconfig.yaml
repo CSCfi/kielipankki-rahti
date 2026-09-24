@@ -1,0 +1,17 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: wav2vec-build
+spec:
+  # Installing torch needs more than the default build memory.
+  resources:
+    limits:
+      memory: 2048Mi
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+  output:
+    to:
+      kind: ImageStreamTag
+      name: wav2vec:latest

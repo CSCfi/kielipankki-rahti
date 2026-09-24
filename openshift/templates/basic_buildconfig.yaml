@@ -5,8 +5,6 @@ metadata:
 parameters:
   - name: IMAGE_NAME
     required: true
-  - name: IMAGE_NAMESPACE
-    value: kielipankki-service-dev
   - name: IMAGE_TAG
     value: "latest"
 
