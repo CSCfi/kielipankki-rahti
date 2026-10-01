@@ -1,13 +1,19 @@
-"""Greedy CTC decoding and forced alignment over log-probabilities.
+"""CTC decoding, forced alignment and transcript normalisation.
 
 Emissions are arrays of shape [T, V] of log-probabilities, one row per model
-frame (20 ms for wav2vec2). Token ids index the model vocabulary; ``blank``
-is the CTC blank, ``delimiter`` the word boundary token.
+frame (20 ms for wav2vec2). torchaudio does the algorithmic work:
+``forced_align`` finds the best path through a transcript and
+``merge_tokens`` turns a frame path into token spans. What remains here is
+grouping tokens into words, the timing corrections, and mapping transcript
+text onto the model vocabulary.
 """
 
+import re
 import unicodedata
 
 import numpy as np
+import torch
+import torchaudio.functional as F
 
 # Timing corrections, chosen on the pohjantuuli clip against the Kaldi
 # aligner's output (docs/wav2vec-migration.md). CTC emits a character about
@@ -21,30 +27,13 @@ MAX_GAP_S = 0.3
 # this much instead, but never into the next word.
 PAUSE_EXTENSION_S = 0.2
 
-# Backpointer table cells (frames times trellis states) allowed for one
-# forced alignment; one byte each.
-MAX_TRELLIS_CELLS = 2_000_000_000
+# Trellis cells (frames times transcript tokens) allowed for one forced
+# alignment, bounding its memory.
+MAX_TRELLIS_CELLS = 1_000_000_000
 
 
 class AlignmentError(Exception):
     pass
-
-
-def _collapse(best_path, blank):
-    """Runs of identical non-blank tokens as (token, start, end) with ``end``
-    exclusive, in frame indices."""
-    units = []
-    prev = blank
-    for t, tok in enumerate(best_path):
-        if tok == blank:
-            prev = blank
-            continue
-        if tok == prev:
-            units[-1][2] = t + 1
-        else:
-            units.append([tok, t, t + 1])
-        prev = tok
-    return units
 
 
 def interval(start_frame, end_frame, frame_s):
@@ -70,6 +59,16 @@ def close_gaps(intervals, max_end):
     return intervals
 
 
+def token_spans(path, scores, blank):
+    """Spans of non-blank tokens on a frame path, repeats merged: a list of
+    torchaudio TokenSpan(token, start, end, score) with ``end`` exclusive."""
+    return F.merge_tokens(
+        torch.as_tensor(np.asarray(path), dtype=torch.int64),
+        torch.as_tensor(np.asarray(scores), dtype=torch.float32),
+        blank=blank,
+    )
+
+
 def greedy_decode(log_probs, frame_s, tokens, blank, delimiter, ignore=()):
     """Best-path decoding with word times and confidences.
 
@@ -85,29 +84,27 @@ def greedy_decode(log_probs, frame_s, tokens, blank, delimiter, ignore=()):
 
     def flush():
         if chars:
-            conf = float(frame_conf[start:end].mean())
             s, e = interval(start, end, frame_s)
             words.append(
                 {
                     "word": "".join(chars),
                     "start": s,
                     "end": e,
-                    "confidence": round(conf, 5),
+                    "confidence": round(float(frame_conf[start:end].mean()), 5),
                 }
             )
         chars.clear()
 
-    for tok, s, e in _collapse(best_path, blank):
-        if tok == delimiter:
+    for span in token_spans(best_path, frame_conf, blank):
+        if span.token == delimiter:
             flush()
-            start = end = None
-        elif tok in ignore:
+        elif span.token in ignore:
             continue
         else:
             if not chars:
-                start = s
-            chars.append(tokens[tok])
-            end = e
+                start = span.start
+            chars.append(tokens[span.token])
+            end = span.end
     flush()
     close_gaps(words, log_probs.shape[0] * frame_s)
     confidence = float(np.mean([w["confidence"] for w in words])) if words else 0.0
@@ -118,64 +115,24 @@ def greedy_decode(log_probs, frame_s, tokens, blank, delimiter, ignore=()):
     }
 
 
-def viterbi_align(log_probs, targets, blank):
-    """Frame spans of each target token on the best CTC path.
-
-    Returns a list of (start, end) frame indices, end exclusive, one per
-    target. Raises AlignmentError if no path exists or the trellis is too
-    large.
-    """
-    T = log_probs.shape[0]
-    N = len(targets)
-    if N == 0:
+def align_tokens(log_probs, targets, blank):
+    """Frame spans of each target token on the best CTC path, as a list of
+    (start, end) with ``end`` exclusive. Raises AlignmentError when no path
+    exists or the trellis would be too large."""
+    if not targets:
         return []
-    S = 2 * N + 1
-    if T * S > MAX_TRELLIS_CELLS:
+    if log_probs.shape[0] * len(targets) > MAX_TRELLIS_CELLS:
         raise AlignmentError("transcript and audio are too long to align in one pass")
-    targets = np.asarray(targets, dtype=np.int64)
-    state_tok = np.full(S, blank, dtype=np.int64)
-    state_tok[1::2] = targets
-    # Skipping the blank between two characters is allowed only when they
-    # differ, otherwise the repeat would collapse.
-    skip = np.zeros(S, dtype=bool)
-    skip[3::2] = targets[1:] != targets[:-1]
-
-    neg_inf = -np.inf
-    alpha = np.full(S, neg_inf, dtype=np.float32)
-    alpha[0] = log_probs[0, blank]
-    alpha[1] = log_probs[0, targets[0]]
-    backptr = np.zeros((T, S), dtype=np.uint8)
-    idx = np.arange(S)
-    for t in range(1, T):
-        stay = alpha
-        step = np.concatenate(([neg_inf], alpha[:-1]))
-        jump = np.concatenate(([neg_inf, neg_inf], alpha[:-2]))
-        jump = np.where(skip, jump, neg_inf)
-        stacked = np.stack((stay, step, jump))
-        choice = stacked.argmax(axis=0)
-        alpha = stacked[choice, idx] + log_probs[t, state_tok]
-        backptr[t] = choice
-
-    s = S - 1 if alpha[S - 1] >= alpha[S - 2] else S - 2
-    if not np.isfinite(alpha[s]):
-        raise AlignmentError("audio is too short for the transcript")
-    path = np.empty(T, dtype=np.int64)
-    for t in range(T - 1, 0, -1):
-        path[t] = s
-        s -= int(backptr[t, s])
-    path[0] = s
-
-    spans = [None] * N
-    for t, s in enumerate(path):
-        if s % 2 == 1:
-            i = (s - 1) // 2
-            if spans[i] is None:
-                spans[i] = [t, t + 1]
-            else:
-                spans[i][1] = t + 1
-    if any(span is None for span in spans):
+    emissions = torch.as_tensor(log_probs, dtype=torch.float32)[None]
+    target_tensor = torch.tensor(targets, dtype=torch.int32)[None]
+    try:
+        alignment, scores = F.forced_align(emissions, target_tensor, blank=blank)
+    except RuntimeError as e:
+        raise AlignmentError(f"audio is too short for the transcript ({e})") from e
+    spans = F.merge_tokens(alignment[0], scores[0].exp(), blank=blank)
+    if len(spans) != len(targets):
         raise AlignmentError("alignment did not cover the transcript")
-    return [tuple(span) for span in spans]
+    return [(span.start, span.end) for span in spans]
 
 
 def align_words(log_probs, frame_s, words, delimiter, blank):
@@ -189,15 +146,14 @@ def align_words(log_probs, frame_s, words, delimiter, blank):
             targets.append(delimiter)
         word_slices.append((len(targets), len(targets) + len(ids)))
         targets.extend(ids)
-    spans = viterbi_align(log_probs, targets, blank)
+    spans = align_tokens(log_probs, targets, blank)
 
     word_tier = []
     letter_tier = []
     for (label, ids, chars), (a, b) in zip(words, word_slices):
-        word_spans = spans[a:b]
         letters = [
             dict(zip(("start", "end"), interval(s, e, frame_s)), label=ch)
-            for (s, e), ch in zip(word_spans, chars)
+            for (s, e), ch in zip(spans[a:b], chars)
         ]
         # Letters within a word are contiguous: each ends where the next begins.
         for x, y in zip(letters, letters[1:]):
@@ -223,17 +179,31 @@ FALLBACK_CHARS = {
 }
 
 
+def spell_numbers(text, lang):
+    """Replace runs of digits with words in the given language, using
+    num2words. Returns None if the language is not supported."""
+    from num2words import num2words
+
+    codes = [lang, lang.split("-")[0]] if lang else []
+    for code in codes:
+        try:
+            return re.sub(r"\d+", lambda m: num2words(int(m.group()), lang=code), text)
+        except NotImplementedError:
+            continue
+    return None
+
+
 class Normalizer:
     """Maps transcript words onto model tokens for alignment."""
 
-    def __init__(self, tokens, blank, delimiter, ignore=()):
+    def __init__(self, tokens, blank, delimiter, ignore=(), lang=None):
+        self.lang = lang
         self.char_to_id = {}
         for i, tok in enumerate(tokens):
             if i in (blank, delimiter) or i in ignore or tok is None:
                 continue
             if len(tok) == 1:
                 self.char_to_id[tok] = i
-        self.lower = all(not c.isupper() for c in self.char_to_id)
 
     def _map_char(self, c):
         """Token ids for one character, or None if it cannot be aligned."""
@@ -258,31 +228,31 @@ class Normalizer:
 
     def words(self, transcript):
         """(label, token ids, source character per token id) for each
-        whitespace-delimited word. Raises AlignmentError for digits or
-        letters the model has no token for; words that consist only of
-        punctuation are dropped."""
+        whitespace-delimited word. Digits are spelled out when num2words
+        knows the language and the spelled words become the labels. Raises
+        AlignmentError for digits in other languages or letters the model has
+        no token for; words that consist only of punctuation are dropped."""
+        if re.search(r"\d", transcript):
+            spelled = spell_numbers(transcript, self.lang)
+            if spelled is None:
+                raise AlignmentError(
+                    "transcript contains digits; write numbers out as words"
+                )
+            transcript = spelled
         result = []
         bad = set()
-        digits = False
         for label in transcript.split():
             ids = []
             chars = []
             for c in label:
                 mapped = self._map_char(c)
                 if mapped is None:
-                    if c.isdigit():
-                        digits = True
-                    else:
-                        bad.add(c)
+                    bad.add(c)
                     continue
                 ids.extend(mapped)
                 chars.extend([c] * len(mapped))
             if ids:
                 result.append((label, ids, chars))
-        if digits:
-            raise AlignmentError(
-                "transcript contains digits; write numbers out as words"
-            )
         if bad:
             raise AlignmentError(
                 "transcript contains characters the model cannot align: "

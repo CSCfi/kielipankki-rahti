@@ -282,10 +282,14 @@ A second replica is the first knob if the queue backs up.
 
 Departures from the plan above, all deliberate:
 
-- **No torchaudio.** Forced alignment is a vectorised Viterbi pass in numpy
-  (`ctc.viterbi_align`), about forty lines, unit tested against planted
-  paths. torchaudio's `forced_align` has been deprecated and the extra
-  dependency pinned the torch version for nothing else.
+- **torchaudio does the CTC algorithms.** Forced alignment is
+  `torchaudio.functional.forced_align`, and `merge_tokens` turns frame paths
+  (forced or greedy) into token spans; `ctc.py` only groups spans into
+  words, applies the timing corrections and maps transcripts onto the
+  vocabulary. Digits in alignment transcripts are spelled out with
+  `num2words` for Finnish and Swedish and rejected for Sámi, which it does
+  not cover. Library implementations are preferred to owned code wherever a
+  library covers the operation.
 - **Timing corrections.** CTC emits a character about two frames after its
   onset, so every boundary is moved 40 ms earlier (`ctc.LATENCY_S`). A
   word's last character also ends early, so a unit's end is extended to the

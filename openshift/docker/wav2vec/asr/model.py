@@ -39,7 +39,9 @@ class Recognizer:
         self.stride_s = stride_s
 
     def _finish(self):
-        self.normalizer = Normalizer(self.tokens, self.blank, self.delimiter, self.ignore)
+        self.normalizer = Normalizer(
+            self.tokens, self.blank, self.delimiter, self.ignore, lang=self.description["language"]
+        )
         self.frame_s = self.frame_ratio / self.sample_rate
         self.chunk = int(self.chunk_s * self.sample_rate)
         self.stride = int(self.stride_s * self.sample_rate)

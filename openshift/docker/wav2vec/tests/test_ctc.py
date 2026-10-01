@@ -1,4 +1,4 @@
-"""Unit tests for greedy decoding, forced alignment and normalisation on
+"""Unit tests for word grouping, forced alignment and normalisation on
 hand-made emissions. Run with ``pytest`` from openshift/docker/wav2vec."""
 
 import numpy as np
@@ -72,25 +72,25 @@ def test_close_gaps_pauses_get_a_bounded_extension():
     assert words[3]["end"] == 2.6
 
 
-def test_viterbi_align_recovers_planted_path():
+def test_align_tokens_recovers_planted_path():
     # a a _ b b b _ _ c c, with a distractor token in the silence.
     path = [2, 2, 0, 3, 3, 3, 0, 0, 4, 4]
-    spans = ctc.viterbi_align(emissions(path), [2, 3, 4], BLANK)
+    spans = ctc.align_tokens(emissions(path), [2, 3, 4], BLANK)
     assert spans == [(0, 2), (3, 6), (8, 10)]
 
 
-def test_viterbi_align_repeated_character():
+def test_align_tokens_repeated_character():
     # "aa" must pass through a blank between the two a's.
     path = [2, 0, 2]
-    spans = ctc.viterbi_align(emissions(path), [2, 2], BLANK)
+    spans = ctc.align_tokens(emissions(path), [2, 2], BLANK)
     assert spans == [(0, 1), (2, 3)]
     with pytest.raises(ctc.AlignmentError):
-        ctc.viterbi_align(emissions([2, 2]), [2, 2], BLANK)
+        ctc.align_tokens(emissions([2, 2]), [2, 2], BLANK)
 
 
-def test_viterbi_align_forces_transcript_through_unlikely_frames():
+def test_align_tokens_forces_transcript_through_unlikely_frames():
     # The audio "says" b but the transcript is "c"; c still gets a span.
-    spans = ctc.viterbi_align(emissions([3, 3, 3]), [4], BLANK)
+    spans = ctc.align_tokens(emissions([3, 3, 3]), [4], BLANK)
     assert len(spans) == 1
     start, end = spans[0]
     assert 0 <= start < end <= 3
@@ -124,9 +124,25 @@ def test_normalizer_maps_and_rejects():
     assert words[0][2] == ["A", "b", "c"]
     assert words[1][1] == [5, 6, 7]
     assert words[2][1] == [9, 9]
+    # A letter that maps to two tokens is the source of both.
+    tokens2 = ["<pad>", "|", "s", "a"]
+    assert ctc.Normalizer(tokens2, 0, 1).words("aß")[0][2] == ["a", "ß", "ß"]
+    # Without a language, digits cannot be spelled out.
     with pytest.raises(ctc.AlignmentError, match="digits"):
         n.words("abc 12")
     with pytest.raises(ctc.AlignmentError, match="cannot align: x"):
         n.words("abc x")
     with pytest.raises(ctc.AlignmentError, match="empty"):
         n.words(" ... ")
+
+
+def test_normalizer_spells_digits_in_known_languages():
+    tokens = ["<pad>", "|"] + list("abcdefghijklmnopqrstuvwxyzäöå")
+    fi = ctc.Normalizer(tokens, 0, 1, lang="fi")
+    labels = [label for label, _, _ in fi.words("sivu 12 ja 3")]
+    assert labels == ["sivu", "kaksitoista", "ja", "kolme"]
+    sv = ctc.Normalizer(tokens, 0, 1, lang="sv-FI")
+    assert [label for label, _, _ in sv.words("sida 12")] == ["sida", "tolv"]
+    sme = ctc.Normalizer(tokens, 0, 1, lang="sme")
+    with pytest.raises(ctc.AlignmentError, match="digits"):
+        sme.words("siidu 12")
