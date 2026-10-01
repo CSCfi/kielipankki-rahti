@@ -14,12 +14,9 @@ which is still manual.
 ```
 openshift/
 ├── buildconfigs # Mostly generated; text and wav2vec need more build memory
-├── deployments # Mostly generated; kaldi, redis, neuralparse and text are hand-edited
+├── deployments # Mostly generated; redis, neuralparse and text are hand-edited
 ├── docker # All the builds are "binary", using these dirs for context
-│   ├── finnish-forced-align # Kaldi aligner, replaced by wav2vec
 │   ├── init_container # Downloads model data into deployments
-│   ├── kaldi-serve # Kaldi ASR, replaced by wav2vec
-│   ├── kaldi-squash
 │   ├── neuralparse
 │   ├── nginx # Routes public paths to the Services defined in services/
 │   ├── redis # Job store and queues

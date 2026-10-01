@@ -238,9 +238,12 @@ A second replica is the first knob if the queue backs up.
    results against `test/reference/`, ignoring timing fields. Run the self
    test. Submit a long recording and watch memory and queue length.
 7. Production: build `wav2vec`, apply the templates, roll out redis and nginx,
-   scale `kaldi-serve` and `finnish-forced-align` to zero. Keep their objects
-   for a week, then delete them and remove the three docker directories, their
-   buildconfigs, imagestreams, services and deployments from the repo.
+   scale `kaldi-serve` and `finnish-forced-align` to zero. Keep their
+   cluster objects for a week, then delete them with `oc delete`. Their
+   sources and manifests are already gone from the repository (the last
+   commit with them is the one before the wav2vec branch), including the
+   `kaldi-serve:latest-py3.6` base image reference that only exists as a
+   cached copy in the production registry.
 8. Update `API.md`: `model` field contents, `intervals` in alignment results,
    tier names, alignment length limit, `queue` response.
 
