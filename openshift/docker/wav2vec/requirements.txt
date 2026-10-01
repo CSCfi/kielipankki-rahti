@@ -1,0 +1,14 @@
+# torch comes from the CPU index given in the Dockerfile.
+torch==2.14.0+cpu
+torchaudio==2.11.0+cpu
+transformers==5.17.0
+safetensors==0.8.0
+onnxruntime==1.24.4
+numpy==2.5.3
+Flask==3.1.3
+gunicorn==26.2.0
+redis==8.1.0
+pydub==0.25.1
+pympi-ling==1.71
+requests==2.34.2
+num2words==0.5.14

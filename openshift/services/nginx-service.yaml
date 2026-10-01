@@ -2,9 +2,8 @@ kind: Service
 apiVersion: v1
 metadata:
   name: nginx
-namespace: kielipankki-services
-labels:
-  io.kompose.service: nginx
+  labels:
+    io.kompose.service: nginx
 spec:
   ports:
     - name: external

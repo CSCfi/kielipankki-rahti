@@ -8,11 +8,17 @@ import os
 parser = argparse.ArgumentParser(description="Test the forced align API")
 parser.add_argument("--audio-file", default="pohjantuuli_F1_1_22050.wav")
 parser.add_argument("--text-file", default="pohjantuuli_F1_1_22050.txt")
+parser.add_argument("--lang", default="fi", help="language code in the path, e.g. fi, sme, sv-FI")
 parser.add_argument("--domain", default="")
 parser.add_argument("--local", action="store_true")
+parser.add_argument(
+    "--save-dir",
+    metavar="DIR",
+    help="write the ctm, eaf and TextGrid results there, named after the audio file",
+)
 args = parser.parse_args()
 
-path = "/audio/align/fi"
+path = f"/audio/align/{args.lang}"
 url = "https://kielipankki.rahtiapp.fi" + path
 if args.domain:
     url = args.domain + path
@@ -44,6 +50,14 @@ while True:
             query_response_d["processing_finished"]
             - query_response_d["processing_started"]
         )
-        print(json.dumps(query_response_d, indent=4))
         print(f"Got result in {duration}")
+        if args.save_dir and "results" in query_response_d:
+            os.makedirs(args.save_dir, exist_ok=True)
+            stem = os.path.splitext(os.path.basename(args.audio_file))[0]
+            results = json.loads(query_response_d["results"])
+            for fmt in ("ctm", "eaf", "TextGrid"):
+                out = os.path.join(args.save_dir, f"{stem}.{fmt}")
+                with open(out, "w", encoding="utf-8") as f:
+                    f.write(results[fmt])
+                print(f"Wrote {out}")
         break

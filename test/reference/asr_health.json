@@ -1,0 +1,6 @@
+{
+  "checks": {
+    "redis": "UP"
+  },
+  "status": "UP"
+}

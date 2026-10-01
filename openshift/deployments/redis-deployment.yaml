@@ -17,6 +17,11 @@ spec:
           name: redis
           ports:
             - containerPort: 6379
-          resources: {}
+          # maxmemory in redis.conf is 2gb; the limit leaves room for
+          # fragmentation and client buffers.
+          resources:
+            requests:
+              memory: 512Mi
+            limits:
+              memory: 2560Mi
       restartPolicy: Always
-status: {}

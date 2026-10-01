@@ -1,0 +1,419 @@
+{
+  "result": {
+    "processing_finished": 1790153513.818,
+    "processing_started": 1790153510.664,
+    "responses": [
+      {
+        "confidence": 0.96044,
+        "transcript": "pohjantuuli ja aurinko pohjantuuli ja aurinko väittelivät kummalla olisi enemmän voimaa kun he samalla näkivät kulkijan jolla oli yllään lämmin takki silloin he sopivat että se on voimakkaampi joka nopeammin saa kulkijan riisumaan takkinsa pohjantuuli alkoi puhaltaa niin että viuhu mutta mitä kovemmin se puhalsi sitä tiukemmin kääri mies takin ympärilleen ja viimein tuuli luopui koko hommasta silloin alkoi aurinko loistaa lämpimästi eikä aikaakaan niin kulkija riisuin manttelista niin oli tuulen pakko myöntää että aurinko oli kuin olikin heistä vahvempi",
+        "words": [
+          {
+            "end": 0.63,
+            "start": 0.03,
+            "word": "pohjantuuli"
+          },
+          {
+            "end": 0.719,
+            "start": 0.63,
+            "word": "ja"
+          },
+          {
+            "end": 1.29,
+            "start": 0.719,
+            "word": "aurinko"
+          },
+          {
+            "end": 2.971,
+            "start": 2.4,
+            "word": "pohjantuuli"
+          },
+          {
+            "end": 3.087,
+            "start": 2.971,
+            "word": "ja"
+          },
+          {
+            "end": 3.51,
+            "start": 3.087,
+            "word": "aurinko"
+          },
+          {
+            "end": 4.08,
+            "start": 3.51,
+            "word": "väittelivät"
+          },
+          {
+            "end": 4.47,
+            "start": 4.08,
+            "word": "kummalla"
+          },
+          {
+            "end": 4.71,
+            "start": 4.47,
+            "word": "olisi"
+          },
+          {
+            "end": 5.04,
+            "start": 4.71,
+            "word": "enemmän"
+          },
+          {
+            "end": 5.52,
+            "start": 5.04,
+            "word": "voimaa"
+          },
+          {
+            "end": 6.06,
+            "start": 5.88,
+            "word": "kun"
+          },
+          {
+            "end": 6.18,
+            "start": 6.06,
+            "word": "he"
+          },
+          {
+            "end": 6.57,
+            "start": 6.18,
+            "word": "samalla"
+          },
+          {
+            "end": 6.99,
+            "start": 6.57,
+            "word": "näkivät"
+          },
+          {
+            "end": 7.62,
+            "start": 6.99,
+            "word": "kulkijan"
+          },
+          {
+            "end": 8.01,
+            "start": 7.68,
+            "word": "jolla"
+          },
+          {
+            "end": 8.22,
+            "start": 8.01,
+            "word": "oli"
+          },
+          {
+            "end": 8.58,
+            "start": 8.22,
+            "word": "yllään"
+          },
+          {
+            "end": 9.0,
+            "start": 8.58,
+            "word": "lämmin"
+          },
+          {
+            "end": 9.51,
+            "start": 9.0,
+            "word": "takki"
+          },
+          {
+            "end": 10.612,
+            "start": 10.17,
+            "word": "silloin"
+          },
+          {
+            "end": 10.71,
+            "start": 10.62,
+            "word": "he"
+          },
+          {
+            "end": 11.19,
+            "start": 10.711,
+            "word": "sopivat"
+          },
+          {
+            "end": 11.4,
+            "start": 11.19,
+            "word": "että"
+          },
+          {
+            "end": 11.58,
+            "start": 11.4,
+            "word": "se"
+          },
+          {
+            "end": 11.73,
+            "start": 11.58,
+            "word": "on"
+          },
+          {
+            "end": 12.51,
+            "start": 11.73,
+            "word": "voimakkaampi"
+          },
+          {
+            "end": 12.87,
+            "start": 12.6,
+            "word": "joka"
+          },
+          {
+            "end": 13.41,
+            "start": 12.87,
+            "word": "nopeammin"
+          },
+          {
+            "end": 13.62,
+            "start": 13.41,
+            "word": "saa"
+          },
+          {
+            "end": 14.064,
+            "start": 13.62,
+            "word": "kulkijan"
+          },
+          {
+            "end": 14.58,
+            "start": 14.064,
+            "word": "riisumaan"
+          },
+          {
+            "end": 15.12,
+            "start": 14.58,
+            "word": "takkinsa"
+          },
+          {
+            "end": 16.8,
+            "start": 16.2,
+            "word": "pohjantuuli"
+          },
+          {
+            "end": 17.07,
+            "start": 16.8,
+            "word": "alkoi"
+          },
+          {
+            "end": 17.55,
+            "start": 17.07,
+            "word": "puhaltaa"
+          },
+          {
+            "end": 17.76,
+            "start": 17.55,
+            "word": "niin"
+          },
+          {
+            "end": 18.0,
+            "start": 17.76,
+            "word": "että"
+          },
+          {
+            "end": 18.568,
+            "start": 18.0,
+            "word": "viuhu"
+          },
+          {
+            "end": 19.38,
+            "start": 19.08,
+            "word": "mutta"
+          },
+          {
+            "end": 19.62,
+            "start": 19.38,
+            "word": "mitä"
+          },
+          {
+            "end": 20.1,
+            "start": 19.62,
+            "word": "kovemmin"
+          },
+          {
+            "end": 20.22,
+            "start": 20.1,
+            "word": "se"
+          },
+          {
+            "end": 20.79,
+            "start": 20.22,
+            "word": "puhalsi"
+          },
+          {
+            "end": 21.24,
+            "start": 20.94,
+            "word": "sitä"
+          },
+          {
+            "end": 21.75,
+            "start": 21.24,
+            "word": "tiukemmin"
+          },
+          {
+            "end": 22.05,
+            "start": 21.75,
+            "word": "kääri"
+          },
+          {
+            "end": 22.32,
+            "start": 22.053,
+            "word": "mies"
+          },
+          {
+            "end": 22.65,
+            "start": 22.32,
+            "word": "takin"
+          },
+          {
+            "end": 23.34,
+            "start": 22.65,
+            "word": "ympärilleen"
+          },
+          {
+            "end": 23.79,
+            "start": 23.67,
+            "word": "ja"
+          },
+          {
+            "end": 24.15,
+            "start": 23.79,
+            "word": "viimein"
+          },
+          {
+            "end": 24.48,
+            "start": 24.15,
+            "word": "tuuli"
+          },
+          {
+            "end": 24.84,
+            "start": 24.48,
+            "word": "luopui"
+          },
+          {
+            "end": 25.14,
+            "start": 24.84,
+            "word": "koko"
+          },
+          {
+            "end": 25.71,
+            "start": 25.14,
+            "word": "hommasta"
+          },
+          {
+            "end": 26.82,
+            "start": 26.4,
+            "word": "silloin"
+          },
+          {
+            "end": 27.18,
+            "start": 26.82,
+            "word": "alkoi"
+          },
+          {
+            "end": 27.63,
+            "start": 27.18,
+            "word": "aurinko"
+          },
+          {
+            "end": 28.05,
+            "start": 27.63,
+            "word": "loistaa"
+          },
+          {
+            "end": 28.77,
+            "start": 28.05,
+            "word": "lämpimästi"
+          },
+          {
+            "end": 29.4,
+            "start": 29.1,
+            "word": "eikä"
+          },
+          {
+            "end": 30.03,
+            "start": 29.4,
+            "word": "aikaakaan"
+          },
+          {
+            "end": 30.209,
+            "start": 30.03,
+            "word": "niin"
+          },
+          {
+            "end": 30.63,
+            "start": 30.209,
+            "word": "kulkija"
+          },
+          {
+            "end": 31.02,
+            "start": 30.63,
+            "word": "riisuin"
+          },
+          {
+            "end": 31.68,
+            "start": 31.02,
+            "word": "manttelista"
+          },
+          {
+            "end": 32.76,
+            "start": 32.49,
+            "word": "niin"
+          },
+          {
+            "end": 32.94,
+            "start": 32.76,
+            "word": "oli"
+          },
+          {
+            "end": 33.3,
+            "start": 32.94,
+            "word": "tuulen"
+          },
+          {
+            "end": 33.66,
+            "start": 33.3,
+            "word": "pakko"
+          },
+          {
+            "end": 34.14,
+            "start": 33.66,
+            "word": "myöntää"
+          },
+          {
+            "end": 34.41,
+            "start": 34.14,
+            "word": "että"
+          },
+          {
+            "end": 34.89,
+            "start": 34.41,
+            "word": "aurinko"
+          },
+          {
+            "end": 35.1,
+            "start": 34.89,
+            "word": "oli"
+          },
+          {
+            "end": 35.31,
+            "start": 35.1,
+            "word": "kuin"
+          },
+          {
+            "end": 35.67,
+            "start": 35.31,
+            "word": "olikin"
+          },
+          {
+            "end": 36.03,
+            "start": 35.67,
+            "word": "heistä"
+          },
+          {
+            "end": 36.6,
+            "start": 36.03,
+            "word": "vahvempi"
+          }
+        ]
+      }
+    ],
+    "status": "done"
+  },
+  "submit": {
+    "file": "pohjantuuli_F1_1_22050.wav",
+    "jobid": "8d0403e8-eff5-48d3-88e2-371d9ba77b50"
+  }
+}

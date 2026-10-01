@@ -1,0 +1,43 @@
+{
+  "result": {
+    "processing_finished": 1790153520.744,
+    "processing_started": 1790153520.178,
+    "responses": [
+      {
+        "confidence": 0.96174,
+        "transcript": "nyt on tarkoitus tunnistaa puhetta",
+        "words": [
+          {
+            "end": 0.63,
+            "start": 0.36,
+            "word": "nyt"
+          },
+          {
+            "end": 0.75,
+            "start": 0.63,
+            "word": "on"
+          },
+          {
+            "end": 1.53,
+            "start": 0.75,
+            "word": "tarkoitus"
+          },
+          {
+            "end": 2.34,
+            "start": 1.56,
+            "word": "tunnistaa"
+          },
+          {
+            "end": 3.12,
+            "start": 2.46,
+            "word": "puhetta"
+          }
+        ]
+      }
+    ],
+    "status": "done"
+  },
+  "submit": {
+    "jobid": "2447935c-a992-4381-b8f9-176111bbc18a"
+  }
+}
