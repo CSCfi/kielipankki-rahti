@@ -15,8 +15,9 @@ import time
 import requests
 from flask import Flask, abort, jsonify, request
 
-from . import audio, config
+from . import audio, config, jobs, results, stages
 from .jobs import ALIGN, ASR, ASR_SEGMENTS, DONE, FAILED, PENDING, Store, align_task_name
+from .results import with_timing
 
 log = logging.getLogger("asr.api")
 
@@ -40,18 +41,6 @@ def check_lang(lang):
 
 def error(message):
     return jsonify({"error": message})
-
-
-def with_timing(response, job):
-    response.update(
-        {
-            "status": job.get("status"),
-            "processing_started": float(job.get("processing_started")),
-        }
-    )
-    if "processing_finished" in job:
-        response["processing_finished"] = float(job["processing_finished"])
-    return response
 
 
 # Submitting recognition jobs
@@ -89,8 +78,25 @@ def read_upload():
     return request.get_data(), extension, file_name
 
 
-def submit_single(lang, wav):
+def stage_options():
+    """The diarisation and punctuation options of a request, or an error
+    response."""
+    try:
+        return stages.StageOptions.from_request(request.values), None
+    except ValueError as e:
+        return None, error(str(e))
+
+
+def enqueue_recognition(lang, wav, parent=None):
+    jobid = store.create_job(ASR, parent=parent) if parent else store.create_job(ASR)
+    store.store_audio(jobid, wav)
+    store.enqueue(lang, jobid, "asr")
+    return jobid
+
+
+def submit_single(lang, wav, options):
     jobid = store.create_job(ASR)
+    stages.add(store, jobid, lang, wav, options)
     store.store_audio(jobid, wav)
     store.enqueue(lang, jobid, "asr")
     return jobid
@@ -102,16 +108,19 @@ def split_and_enqueue(lang, parent, wav):
         segments = audio.split_on_silence(audio.segment_from_wav(wav))
         children = []
         for segment in segments:
-            jobid = submit_single(lang, audio.segment_to_wav(segment))
+            jobid = enqueue_recognition(lang, audio.segment_to_wav(segment), parent)
             children.append({"duration": segment.duration_seconds, "jobid": jobid})
         store.set_field(parent, "segments", json.dumps(children))
     except Exception:
         log.exception("splitting %s failed", parent)
         store.fail(parent, "could not split audio")
+    # The children may all have finished before the segment list existed.
+    stages.settle(store, parent)
 
 
-def submit_split(lang, wav):
+def submit_split(lang, wav, options):
     parent = store.create_job(ASR_SEGMENTS)
+    stages.add(store, parent, lang, wav, options)
     threading.Thread(target=split_and_enqueue, args=(lang, parent, wav), daemon=True).start()
     return parent
 
@@ -129,19 +138,25 @@ def raw_wav_body():
 @app.route("/audio/asr/<lang>/submit", methods=["POST"])
 def route_submit(lang):
     check_lang(lang)
+    options, err = stage_options()
+    if err:
+        return err
     wav, err = raw_wav_body()
     if err:
         return err
-    return jsonify({"jobid": submit_single(lang, wav)})
+    return jsonify({"jobid": submit_single(lang, wav, options)})
 
 
 @app.route("/audio/asr/<lang>/segmented", methods=["POST"])
 def route_segmented(lang):
     check_lang(lang)
+    options, err = stage_options()
+    if err:
+        return err
     wav, err = raw_wav_body()
     if err:
         return err
-    return jsonify({"jobid": submit_split(lang, wav)})
+    return jsonify({"jobid": submit_split(lang, wav, options)})
 
 
 @app.route("/audio/asr/<lang>/submit_file", methods=["POST"])
@@ -150,6 +165,9 @@ def route_submit_file(lang):
     if (request.content_length or 0) >= config.MAX_CONTENT_LENGTH:
         return error(f"body size exceeded maximum of {config.MAX_CONTENT_LENGTH} bytes")
     do_split = request.args.get("nosplit", "").lower() != "true"
+    options, err = stage_options()
+    if err:
+        return err
     try:
         data, extension, file_name = read_upload()
     except audio.AudioError as e:
@@ -159,7 +177,7 @@ def route_submit_file(lang):
     except audio.AudioError as e:
         log.info("could not decode %r: %s", file_name, e)
         return error("could not process file")
-    jobid = submit_split(lang, wav) if do_split else submit_single(lang, wav)
+    jobid = submit_split(lang, wav, options) if do_split else submit_single(lang, wav, options)
     return jsonify({"jobid": jobid, "file": file_name})
 
 
@@ -167,23 +185,51 @@ def route_submit_file(lang):
 def route_asr_sync(lang):
     """Recognise a WAV body and wait for the result."""
     check_lang(lang)
+    options, err = stage_options()
+    if err:
+        return err
     wav, err = raw_wav_body()
     if err:
         return err
-    jobid = submit_single(lang, wav)
+    jobid = submit_single(lang, wav, options)
     deadline = time.time() + config.SYNC_TIMEOUT_S
     while time.time() < deadline:
-        job = store.get_job(jobid)
-        if job is None:
+        view = load_recognition(jobid)
+        if view is None:
             return error("job id not available")
-        if job.get("status") == DONE:
+        status, failure = view.status()
+        if status == DONE:
             response = dict(store.model_description(lang))
-            response["responses"] = json.loads(job["response"])["responses"]
+            response["responses"] = view.segment_results()[0]["responses"]
+            add_stage_results(response, view)
             return jsonify(response)
-        if job.get("status") == FAILED:
-            return error(job.get("error", "processing failed"))
+        if status == FAILED:
+            return error(failure or "processing failed")
         time.sleep(0.25)
     return jsonify({"error": "timed out waiting for the result", "jobid": jobid})
+
+
+def load_recognition(jobid):
+    """The query-time view of a recognition job. A pending job's punctuation
+    trigger is re-checked first, so that a job whose last worker died
+    between finishing and triggering still completes."""
+    view = results.load(store, jobid)
+    if view is not None and view.status()[0] == PENDING:
+        stages.settle(store, jobid)
+        view = results.load(store, jobid)
+    return view
+
+
+def add_stage_results(response, view):
+    """Diarisation turns and the state of the requested stages."""
+    checks, warnings = view.checks()
+    if checks:
+        response["checks"] = checks
+    if warnings:
+        response["warnings"] = warnings
+    if view.turns() is not None:
+        response["diarization"] = {"speakers": view.speakers(), "turns": view.turns()}
+    return response
 
 
 # Querying recognition jobs
@@ -193,49 +239,29 @@ def route_asr_sync(lang):
 def route_query_job(lang):
     check_lang(lang)
     jobid = request.get_data(as_text=True).strip()
-    job = store.get_job(jobid) if jobid else None
-    if job is None:
+    view = load_recognition(jobid)
+    if view is None or view.missing_child:
         return error("job id not available")
-    response = with_timing(json.loads(job.get("response", "{}")), job)
-    if job.get("type") == ASR:
-        return jsonify(response)
-    if job.get("type") != ASR_SEGMENTS:
-        return error("job id not available")
-    if job.get("status") == FAILED:
-        return jsonify(response)
-    if "segments" not in job:
-        if job.get("status") == PENDING:
-            return jsonify(response)
-        log.error("segments missing from %s: %s", jobid, job)
-        return error("internal server error")
-
-    response["segments"] = []
-    processing_finished = 0.0
-    running_time = 0.0
-    failed = None
-    for segment in json.loads(job["segments"]):
-        child = store.get_job(segment["jobid"])
-        if child is None:
-            return error("job id not available")
-        if child.get("status") == PENDING:
-            return jsonify({"status": PENDING})
-        result = with_timing(json.loads(child.get("response", "{}")), child)
-        if child.get("status") == FAILED and failed is None:
-            failed = result.get("error", "processing failed")
-        duration = float(segment["duration"])
-        result["start"] = round(running_time, 3)
-        running_time += duration
-        result["stop"] = round(running_time, 3)
-        result["duration"] = round(running_time, 3)
-        processing_finished = max(processing_finished, result.get("processing_finished", 0.0))
-        response["segments"].append(result)
-    response["processing_finished"] = processing_finished
-    response["status"] = DONE
-    if failed:
-        response["status"] = FAILED
-        response["error"] = failed
+    job = view.job
+    status, failure = view.status()
+    if not view.split:
+        response = view.segment_results()[0]
+        response["status"] = status
+        if status == DONE:
+            response["processing_finished"] = view.processing_finished()
+        return jsonify(add_stage_results(response, view))
+    if job.get("status") == FAILED or view.segments is None:
+        return jsonify(with_timing(json.loads(job.get("response", "{}")), job))
+    if status == PENDING:
+        return jsonify({"status": PENDING})
+    response = with_timing({}, job)
+    response["segments"] = view.segment_results()
+    response["processing_finished"] = view.processing_finished()
+    response["status"] = status
+    if failure:
+        response["error"] = failure
     response["model"] = store.model_description(lang)
-    return jsonify(response)
+    return jsonify(add_stage_results(response, view))
 
 
 @app.route("/audio/asr/<lang>/query_job/tekstiks", methods=["POST"])
@@ -254,44 +280,48 @@ def route_query_job_tekstiks(lang):
         retval["message"] = "In progress"
         return jsonify(retval)
 
-    job = store.get_job(jobid) if jobid else None
-    if job is None or job.get("type") not in (ASR, ASR_SEGMENTS):
+    view = load_recognition(jobid)
+    if view is None:
         return fail(TEKSTIKS_NO_JOB, "job id not found")
+    job = view.job
     with_timing(retval, job)
     if job.get("status") == FAILED:
         return fail(TEKSTIKS_FAILED, job.get("error", "transcribing failed"))
-    if "segments" not in job:
-        if retval["status"] != DONE:
+    if not view.split:
+        if job.get("status") != DONE:
             return in_progress()
         return fail(TEKSTIKS_NO_JOB, "job has incompatible api request")
+    if view.segments is None:
+        return in_progress()
+    if view.missing_child:
+        return fail(TEKSTIKS_NO_JOB, "one or more job segment id's not found")
+    status, failure = view.status()
+    if status == PENDING:
+        return in_progress()
+    if status == FAILED:
+        return fail(TEKSTIKS_FAILED, failure or "transcribing failed")
 
-    retval["result"] = {"speakers": {"S0": {}}, "sections": []}
-    running_time = 0.0
-    processing_finished = 0.0
-    for segment in json.loads(job["segments"]):
-        child = store.get_job(segment["jobid"])
-        if child is None:
-            return fail(TEKSTIKS_NO_JOB, "one or more job segment id's not found")
-        if child.get("status") == PENDING:
-            return in_progress()
-        if child.get("status") == FAILED:
-            return fail(TEKSTIKS_FAILED, child.get("error", "transcribing failed"))
-        result = with_timing(json.loads(child.get("response", "{}")), child)
-        processing_finished = max(processing_finished, result.get("processing_finished", 0.0))
-        duration = float(segment["duration"])
+    retval["result"] = {"speakers": {s: {} for s in view.speakers()}, "sections": []}
+    segment_results = view.segment_results()
+    placed = view.absolute_words(segment_results)
+    for i, (segment, result) in enumerate(zip(view.segments, segment_results)):
         alternative = result["responses"][0]
-        retval["result"]["sections"].append(
-            {
-                "start": round(running_time, 3),
-                "end": round(running_time + duration, 3),
-                "transcript": alternative["transcript"],
-                "words": alternative.get("words", []),
-            }
-        )
-        running_time += duration
+        section = {"type": "speech", "start": segment["start"], "end": segment["stop"]}
+        turns = results.turn_entries([w for s, _, w in placed if s == i])
+        if turns:
+            section["transcript"] = alternative["transcript"]
+            section["turns"] = turns
+        else:
+            section["type"] = "non-speech"
+        retval["result"]["sections"].append(section)
+    checks, warnings = view.checks()
+    if checks:
+        retval["checks"] = checks
+    if warnings:
+        retval["warnings"] = warnings
     retval["status"] = DONE
     retval["done"] = True
-    retval["processing_finished"] = processing_finished
+    retval["processing_finished"] = view.processing_finished()
     return jsonify(retval)
 
 
@@ -362,6 +392,10 @@ def health(lang):
             response["workers"] = store.worker_count(lang)
             if response["workers"]:
                 response["checks"]["workers"] = "UP"
+            response["stages"] = {
+                queue: {"workers": store.worker_count(queue), "queue_length": store.queue_length(queue)}
+                for queue in (jobs.DIARIZE_QUEUE, jobs.PUNCTUATE_QUEUE)
+            }
     except Exception:
         response["status"] = "DOWN"
     return jsonify(response)
@@ -424,6 +458,10 @@ def route_self_test(lang):
     checks = response.setdefault("checks", {})
     for name in ("decoding", "submit_file", "query_response", "align"):
         checks[name] = "DOWN" if clips_lang else "SKIPPED"
+    # Stages are reported as the query result reports them; one that has no
+    # worker is skipped rather than failed.
+    for name in ("diarization", "punctuation"):
+        checks[name] = "SKIPPED"
     if clips_lang is None:
         return jsonify(response)
     data = f"{config.TEST_DATA_DIR}/{clips_lang}"
@@ -469,6 +507,7 @@ def route_self_test(lang):
             result = poll(f"{base}/query_job", asr_job, 60)
             if result and result["status"] == DONE and result["segments"]:
                 checks["query_response"] = "UP"
+                checks.update(result.get("checks", {}))
         except Exception as e:
             log.error("self test: query_job failed: %s", e)
     if align_job:

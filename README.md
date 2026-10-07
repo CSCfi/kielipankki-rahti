@@ -51,8 +51,11 @@ oc process -f templates/basic_deployment.yaml -p SERVICE_NAME=redis -p SERVICE_P
 (`openshift/docker/wav2vec`), which runs as the `asr-api` deployment and as
 the `wav2vec-fi` worker. The API converts uploads with ffmpeg, splits them on
 silence and queues jobs in Redis; the worker loads a wav2vec2 CTC model from
-Aalto once and serves both recognition and forced alignment from it. The
-model is not in the image: `tools/package_wav2vec_model.py` zips a Hugging
+Aalto once and serves both recognition and forced alignment from it. Two
+more deployments of the same image, `diarize` and `punctuate`, are shared by
+all languages: speaker diarisation with sherpa-onnx or a pyannote.audio
+pipeline, and punctuation with an xlm-roberta model, both on by default for
+recognition requests and packaged by `tools/package_stage_models.py`. The model is not in the image: `tools/package_wav2vec_model.py` zips a Hugging
 Face checkpoint for the Allas bucket `kielipankki_services_data`, and an init
 container fetches it. The Sámi and Finland Swedish models are fairseq
 checkpoints with a custom encoder; `tools/convert_ebranchformer_to_onnx.py`

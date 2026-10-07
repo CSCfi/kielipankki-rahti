@@ -1,9 +1,8 @@
 # Replacing the Kaldi ASR and aligner with wav2vec2
 
-Status: September 2026. Phase 1 is implemented in `openshift/docker/wav2vec`
-and awaits deployment to the test project; the section "Phase 1 as built"
-lists where the implementation departs from the plan. Later phases are
-outlined so that phase 1 does not paint us into a corner.
+Status: October 2026. Phases 1 to 4 are implemented in
+`openshift/docker/wav2vec`; the "as built" sections list where each
+departs from its plan. Phases 2 and 3 await deployment to the test project.
 
 ## Why
 
@@ -350,25 +349,133 @@ the deployment itself, and the `API.md` update planned as step 8.
 ## Phase 2: diarisation
 
 One `diarize` worker for all languages, running sherpa-onnx with the pyannote
-segmentation 3.0 model and the WeSpeaker ResNet34 embedding model (about 13x
-real time on four threads), or pyannote.audio 4 community-1 if its accuracy is
-needed and the gated download and heavier dependencies are acceptable. The API
+segmentation 3.0 model and a speaker embedding model (about 13x real time on
+four threads), or pyannote.audio 4 community-1 if its accuracy is needed and
+the gated download and heavier dependencies are acceptable. The API
 enqueues `diarize` alongside the recognition segments when `diarize` is not
-`false`; the worker writes `diarization` (turns with speaker labels) to the
-parent hash. `query_job` assigns each word to the turn with maximal overlap;
-`tekstiks` fills `speakers` and per-speaker `sections` instead of the fixed
-`S0`. Diarisation failure degrades to a single speaker and a `checks` entry.
+`false`; `query_job` assigns each word to the turn with maximal overlap;
+`tekstiks` fills `speakers` and turns instead of the fixed `S0`. Diarisation
+failure degrades to a single speaker and a `checks` entry.
 
 ## Phase 3: postprocessing
 
 One `punctuate` worker running the `1-800-BAD-CODE/xlm-roberta_punctuation_
-fullstop_truecase` ONNX model (Finnish and Swedish covered, Sámi not), called
-by the recognition worker after decoding when `punctuate` is not `false`, or
-as a separate queue stage. Responses gain `transcript_punctuated` next to the
-raw transcript; the raw transcript stays as is. Restrict the download to the
-ONNX and SentencePiece files, the repository also carries an unneeded 1.1 GB
-`.nemo` file. Sámi gets sentence-initial capitalisation from pause and turn
-boundaries in shared code.
+fullstop_truecase` ONNX model, as a separate queue stage after recognition
+and diarisation, when `punctuate` is not `false`. Responses gain
+`transcript_punctuated` next to the raw transcript; the raw transcript stays
+as is. Only the ONNX and SentencePiece files are packaged, the repository
+also carries an unneeded 1.1 GB `.nemo` file. Languages the model does not
+cover get sentence-initial capitalisation from pause and turn boundaries.
+
+### Phases 2 and 3 as built (2026-10-01)
+
+- **Stage jobs.** A recognition job submitted with `diarize` or `punctuate`
+  (both default to on; `false` declines) gets one job hash per stage, named
+  in its `diarize_job` and `punctuate_job` fields. The diarisation job has
+  its own copy of the whole audio and is queued on `asr:diarize` at submit
+  time, so it runs in parallel with recognition. The punctuation job is
+  created at submit time but queued on `asr:punctuate` only when every
+  recognition segment and the diarisation have settled: `stages.settle`
+  runs after every job in every worker and after splitting, and a
+  set-if-absent field on the punctuation job makes sure it is queued once.
+  The job as a whole stays `pending` until its stages have settled, so
+  clients that stop polling at `done` see speakers and punctuation.
+- **Stages without a worker are skipped, not waited for.** At submit time
+  the API checks the stage's worker heartbeats; with none alive the stage
+  job is written as `skipped` at once. A stage that fails leaves the job
+  `done` without its output. Either case is reported in `checks`
+  (`UP`, `DOWN`, `SKIPPED`, or `PENDING` in a partial result) and
+  `warnings` (the reason) of the query responses.
+- **One image, four roles.** `ROLE=diarize` and `ROLE=punctuate` run the
+  same `asr.worker` loop with a different handler; the worker template
+  takes `ROLE`, and `deploy_from_scratch.sh` deploys the stages listed in
+  `STAGES` with `WORKER_ARGS_DIARIZE` and `WORKER_ARGS_PUNCTUATE` sized for
+  the models (2 CPU and 1Gi; 2 CPU and 3Gi). `tools/package_stage_models.py`
+  builds `model-diarize.zip` and `model-punctuate.zip` for the init
+  container, which finds the model directory by its `kielipankki.json`.
+- **Embedding model: TitaNet, not WeSpeaker.** The first deployment used
+  the WeSpeaker ResNet34 embeddings and labelled the whole Finland Swedish
+  test interview as one speaker, with the second voice appearing only as
+  one-second interjections; the same happened at any clustering threshold.
+  Of the embedding models sherpa-onnx redistributes, NVIDIA's TitaNet
+  small found the interviewer's turns (0 to 5 s, 21 to 29 s, 48 to 50 s)
+  with the speaker count fixed at two and three speakers unconstrained;
+  3D-Speaker's CAM++ came close, ERes2Net was slower for no gain. On the
+  Sámi interview all of them agree once the count is fixed, so that clip
+  cannot rank them. `tools/package_stage_models.py` packages TitaNet by
+  default and takes `--embedding` for the others. Diarisation of the 75 s
+  clip takes 5 s on four threads with TitaNet against 7 s with WeSpeaker.
+- **pyannote.audio backend (2026-10-05).** `load_diarizer` picks
+  `PyannoteDiarizer` when the model directory holds a pyannote pipeline
+  (`config.yaml`, or `backend: pyannote` in `kielipankki.json`), otherwise
+  `SherpaDiarizer`; both return the same turn list. The pyannote backend
+  is meant for `pyannote/speaker-diarization-community-1` (September
+  2025, CC BY 4.0, gated: accept the terms on huggingface.co and run
+  `tools/package_stage_models.py diarize --backend pyannote` with
+  `HF_TOKEN` set). It reports better speaker counting than the 3.1
+  pipeline that sherpa-onnx re-implements, and its exclusive diarisation
+  has no overlapping turns, so word assignment never has to arbitrate
+  between nested turns; the query-time smoothing of speaker labels that
+  the nested turns had needed was removed again. pyannote.audio 4 sends
+  usage telemetry unless `PYANNOTE_METRICS_ENABLED=false`, which the
+  Dockerfile sets. The pipeline's default batch size of 32 windows per
+  forward pass was killed by a 2Gi memory limit on the first 75 s clip;
+  the worker sets both batch sizes to `ASR_DIARIZE_BATCH` (4), since
+  batching gains nothing on CPU. Not yet measured on real audio: the models
+  are gated, so the first run is in the test project.
+- **Diarisation output.** The worker writes `{"turns": [{"speaker",
+  "start", "end"}], "speakers"}` with labels `S0`, `S1`, ... in order of
+  first appearance. sherpa-onnx's turns can nest (a short interjection inside
+  a long turn), so a word takes the turn it overlaps most and, on a tie, the
+  shorter one; a word overlapping no turn takes the nearest. An optional
+  `num_speakers` request parameter fixes the number of clusters; otherwise
+  the clustering threshold (`ASR_DIARIZE_THRESHOLD`, 0.5) decides. Measured
+  locally with four threads: 10x real time, 200 MB of models.
+- **Punctuation output.** Every word gains `word_with_punctuation` and
+  `punctuation`, the names of the Estonian pipeline's format, and every
+  alternative gains `transcript_punctuated`. The punctuation worker
+  punctuates the whole job's words as one text, so sentences run across
+  segment boundaries and the model has all the context, then capitalises
+  the first word of each turn (speaker change or two seconds of silence),
+  as the Estonian pipeline does. Punctuating turn by turn was tried first
+  and chopped the stretches where one speaker's short interjections nest in
+  the other's turn into one-word sentences. The `punctuators` package runs
+  the model; its output is mapped back word by word, and a word whose
+  letters the output does not reproduce keeps its own letters. ONNX Runtime's thread count is set by patching the session
+  constructor the package calls, which offers no other way.
+- **Swedish uses the model after all.** The model's 47 languages include
+  Finnish but not Swedish; tried zero-shot on the Finland Swedish test
+  transcript it produced sentence breaks, questions and the capitals of
+  Helsingfors and OS, so `ASR_PUNCTUATE_MODEL_LANGUAGES` defaults to
+  `fi,sv` (matched on the first subtag, so `sv-FI` counts). On Sámi text it
+  capitalised random words, so Sámi and any other language get the rules:
+  a capital at the start of a turn and after a pause of at least
+  `ASR_PUNCTUATE_PAUSE_S` (1 s), and a full stop before the pause and at the
+  end of the turn.
+- **fp32, both graphs shipped.** The zip holds the fp32 graph (1.1 GB) and
+  an int8 copy (280 MB, MatMul and Gather weights). Int8 changed 4 of 80
+  Finnish words and 25 of 224 Swedish words, some for the worse (`OS` to
+  `os`, lost commas), and the model takes well under a second per minute of
+  speech either way, so the punctuation worker runs `QUANTIZE=none`: 2.1 GB
+  peak RSS against 0.8 GB for int8.
+- **tekstiks turns.** Sections keep `start`, `end` and the raw
+  `transcript` and gain `type` and `turns`, each `{"speaker", "start",
+  "end", "transcript", "words"}` as in the Estonian pipeline's
+  `resegment_json.py`: absolute times, the transcript built from
+  `word_with_punctuation`, a turn ending where the next begins, and
+  `speakers` listing every label. Turns do not cross sections. At the
+  tekstiks developer's request (2026-10-06) the section-level `words`,
+  which duplicated the turns' words with segment-relative times, were
+  dropped, and a section with no recognised words is `type: "non-speech"`
+  with no turns.
+- **A job is attempted at most twice** (`ASR_MAX_ATTEMPTS`). Workers
+  requeue the jobs they were holding when they start, so a job that kills
+  its worker, as the first pyannote job did when the pod's memory limit was
+  still 1Gi, would otherwise be retried for ever; the second death fails it
+  with `processing failed repeatedly`.
+- **Health** gains `stages` with the worker count and queue length of
+  `diarize` and `punctuate`; the self test reports `diarization` and
+  `punctuation` as the query result does.
 
 ## Phase 4: Sámi and Finland Swedish
 

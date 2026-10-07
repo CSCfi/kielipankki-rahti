@@ -15,6 +15,10 @@
 #   WORKER_ARGS_<CODE>
 #                 extra template parameters for that language's worker, for
 #                 example WORKER_ARGS_SME="-p CPU_REQUEST=1 -p CPU_LIMIT=2 -p THREADS=2"
+#   STAGES        space separated stage workers shared by all languages,
+#                 default "diarize punctuate"; MODEL_URL_<STAGE> and
+#                 WORKER_ARGS_<STAGE> work as for languages, with defaults
+#                 sized for the two models (see tools/package_stage_models.py)
 #   SKIP          space separated components to leave out, for example
 #                 SKIP="text neuralparse" for a project that only tests audio
 #
@@ -25,11 +29,18 @@ cd "$(dirname "$0")"
 
 PROJECT=$(oc project -q)
 LANGUAGES=${LANGUAGES:-fi}
+STAGES=${STAGES:-diarize punctuate}
+# The diarisation models are small whichever backend serves them; the
+# punctuation graph is 1.1 GB in fp32, which is served because int8 changes
+# some of the output.
+WORKER_ARGS_DIARIZE=${WORKER_ARGS_DIARIZE:-"-p CPU_REQUEST=1 -p CPU_LIMIT=2 -p THREADS=2 -p MEMORY_REQUEST=256Mi -p MEMORY_LIMIT=1Gi -p MODEL_VOLUME_SIZE=256Mi"}
+WORKER_ARGS_PUNCTUATE=${WORKER_ARGS_PUNCTUATE:-"-p CPU_REQUEST=500m -p CPU_LIMIT=2 -p THREADS=2 -p MEMORY_REQUEST=1536Mi -p MEMORY_LIMIT=3Gi -p MODEL_VOLUME_SIZE=4Gi -p QUANTIZE=none"}
 SKIP=${SKIP:-}
 REGISTRY=image-registry.apps.2.rahti.csc.fi
 
 echo "Deploying to project $PROJECT"
 echo "Languages: $LANGUAGES"
+echo "Stages: $STAGES"
 
 skipped() {
     [[ " $SKIP " == *" $1 "* ]]
@@ -45,6 +56,11 @@ model_url() {
     echo "${!var:-https://a3s.fi/kielipankki_services_data/model-$(echo "$1" | tr '[:upper:]' '[:lower:]')-wav2vec2.zip}"
 }
 
+stage_model_url() {
+    local var="MODEL_URL_$(code_var "$1")"
+    echo "${!var:-https://a3s.fi/kielipankki_services_data/model-$1.zip}"
+}
+
 worker_args() {
     local var="WORKER_ARGS_$(code_var "$1")"
     echo "${!var:-}"
@@ -53,9 +69,26 @@ worker_args() {
 for lang in $LANGUAGES; do
     echo "  $lang: $(model_url "$lang") $(worker_args "$lang")"
 done
+for stage in $STAGES; do
+    skipped "$stage" || echo "  $stage: $(stage_model_url "$stage") $(worker_args "$stage")"
+done
 if [ -n "$SKIP" ]; then
     echo "Skipping: $SKIP"
 fi
+
+# Deployments that exist before this run keep their old pods when oc apply
+# finds nothing to change in them, and a rebuilt :latest image is only
+# picked up by a restart. New deployments pull the new image on creation and
+# must not be restarted in the middle of their model download.
+existing=" $(oc get deployments -o jsonpath='{.items[*].metadata.name}') "
+
+restart_existing() {
+    for name in "$@"; do
+        if [[ "$existing" == *" $name "* ]]; then
+            oc rollout restart "deployment/$name"
+        fi
+    done
+}
 
 # Hand-edited manifests name the production project in their image
 # references; rewrite it for the current project.
@@ -136,5 +169,30 @@ for lang in $LANGUAGES; do
         -p LANG="$lang" -p NAME="wav2vec-$(echo "$lang" | tr '[:upper:]' '[:lower:]')" \
         -p MODEL_URL="$(model_url "$lang")" $(worker_args "$lang") | oc apply -f -
 done
+for stage in $STAGES; do
+    skipped "$stage" && continue
+    # shellcheck disable=SC2046
+    oc process -f templates/wav2vec_worker.yaml -p IMAGE_NAMESPACE="$PROJECT" \
+        -p ROLE="$stage" -p NAME="$stage" \
+        -p MODEL_URL="$(stage_model_url "$stage")" $(worker_args "$stage") | oc apply -f -
+done
+
+# Roll out the rebuilt images
+
+for image in "${images[@]}"; do
+    case "$image" in
+        wav2vec|init_container) ;;
+        *) restart_existing "$image" ;;
+    esac
+done
+if ! skipped wav2vec || ! skipped init_container; then
+    restart_existing asr-api
+    for lang in $LANGUAGES; do
+        restart_existing "wav2vec-$(echo "$lang" | tr '[:upper:]' '[:lower:]')"
+    done
+    for stage in $STAGES; do
+        skipped "$stage" || restart_existing "$stage"
+    done
+fi
 
 echo "Done. Watch the rollout with: oc get pods -w"

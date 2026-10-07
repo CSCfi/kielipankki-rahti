@@ -13,7 +13,8 @@ def _float(name, default):
     return float(value) if value else default
 
 
-# "api" serves HTTP, "worker" consumes one language queue.
+# "api" serves HTTP, "worker" consumes one language queue, "diarize" and
+# "punctuate" consume the stage queues of those names.
 ROLE = os.environ.get("ROLE", "api")
 
 # Worker: language code used in public paths and as the queue name.
@@ -31,6 +32,27 @@ QUANTIZE = os.environ.get("ASR_QUANTIZE", "int8")  # "none" or "int8"
 THREADS = _int("ASR_THREADS", 4)
 CHUNK_S = _float("ASR_CHUNK_S", 30.0)
 STRIDE_S = _float("ASR_STRIDE_S", 5.0)
+
+# Diarisation worker, sherpa-onnx backend: clustering threshold for the
+# speaker embeddings when the request does not fix the number of speakers
+# (sherpa-onnx default 0.5; lower finds more speakers).
+DIARIZE_THRESHOLD = _float("ASR_DIARIZE_THRESHOLD", 0.5)
+# Diarisation worker, pyannote backend: windows per forward pass of the
+# segmentation and embedding models. The pipeline's own default of 32 needs
+# gigabytes of activations on CPU, where batching gains nothing.
+DIARIZE_BATCH = _int("ASR_DIARIZE_BATCH", 4)
+
+# Punctuation worker: languages the punctuation model is applied to, by
+# language code or its first subtag; other languages get rule-based
+# capitalisation. Finnish is in the model's training languages and Swedish
+# is not, but zero-shot output on Finland Swedish was good enough to use.
+PUNCTUATE_MODEL_LANGUAGES = [
+    lang.strip()
+    for lang in os.environ.get("ASR_PUNCTUATE_MODEL_LANGUAGES", "fi,sv").split(",")
+    if lang.strip()
+]
+# Rule-based punctuation: a pause this long ends a sentence.
+PUNCTUATE_PAUSE_S = _float("ASR_PUNCTUATE_PAUSE_S", 1.0)
 
 # Prefixed because Kubernetes sets REDIS_PORT and friends from the redis
 # Service (to strings like tcp://172.30.1.2:6379).
@@ -55,3 +77,6 @@ SYNC_TIMEOUT_S = 60.0
 # A worker that has not refreshed its heartbeat for this long is considered
 # gone and the jobs it had claimed are put back on the queue.
 WORKER_HEARTBEAT_S = 300
+# A job is attempted at most this many times; a job that keeps killing the
+# worker that claims it (out of memory, say) then fails instead of looping.
+MAX_ATTEMPTS = _int("ASR_MAX_ATTEMPTS", 2)
