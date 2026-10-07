@@ -17,11 +17,13 @@ COPY test test
 
 # OpenShift runs the container as an arbitrary user with no home directory;
 # gunicorn and the Hugging Face libraries both want to write under HOME.
+# pyannote.audio reports usage to pyannote's servers unless told not to.
 ENV PYTHONUNBUFFERED=1 \
     HOME=/tmp \
     HF_HOME=/tmp/hf \
     HF_HUB_OFFLINE=1 \
-    TRANSFORMERS_OFFLINE=1
+    TRANSFORMERS_OFFLINE=1 \
+    PYANNOTE_METRICS_ENABLED=false
 RUN chmod -R g=u /app && chmod +x entrypoint.sh
 
 EXPOSE 5000

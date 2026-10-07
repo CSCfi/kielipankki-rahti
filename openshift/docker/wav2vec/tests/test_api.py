@@ -11,7 +11,7 @@ import fakeredis
 import numpy as np
 import pytest
 
-from asr import api, audio, config, ctc, jobs, worker
+from asr import api, audio, config, ctc, jobs, punctuate, worker
 
 TOKENS = ["<pad>", "<s>", "</s>", "<unk>", "|", "a", "b", "c", "d"]
 
@@ -58,13 +58,35 @@ def client(store):
     return api.app.test_client()
 
 
-def run_worker(store, jobs_expected):
-    w = worker.Worker(store, FakeRecognizer(), lang="fi", name="test-worker")
+class FakeDiarizer:
+    """Two speakers: the first half of the audio and the second."""
+
+    description = {"name": "fake-diarizer"}
+
+    def turns(self, samples, num_speakers=None, progress=None):
+        half = round(len(samples) / 16000 / 2, 3)
+        return [{"speaker": "S0", "start": 0.0, "end": half}, {"speaker": "S1", "start": half, "end": 2 * half}]
+
+
+class RulesPunctuator:
+    description = {"name": "rules"}
+
+    def punctuate(self, turns, lang):
+        return punctuate.by_rules(turns)
+
+
+def run_worker(store, jobs_expected, handler=None):
+    handler = handler or worker.RecognitionHandler(FakeRecognizer(), "fi")
+    w = worker.Worker(store, handler, name="test-worker")
     w.start()
     for _ in range(jobs_expected):
-        raw, message = store.claim("fi", "test-worker")
-        w.handle(message)
-        store.release("fi", "test-worker", raw)
+        assert w.process_next()
+
+
+def run_stage_workers(store):
+    """Run whatever the diarisation and punctuation queues hold."""
+    for handler in (worker.DiarizationHandler(FakeDiarizer()), worker.PunctuationHandler(RulesPunctuator())):
+        run_worker(store, store.queue_length(handler.queue), handler)
 
 
 def wav_bytes(seconds, rate=16000, channels=1):
@@ -89,12 +111,129 @@ def test_submit_file_nosplit_and_query(client, store):
     run_worker(store, 1)
     result = client.post("/audio/asr/fi/query_job", data=r["jobid"]).get_json()
     assert result["status"] == "done"
-    assert set(result) == {"status", "processing_started", "processing_finished", "responses"}
+    # No stage worker is running, so both stages were skipped at submit time.
+    assert set(result) == {"status", "processing_started", "processing_finished", "responses", "checks", "warnings", "type"}
+    assert result["checks"] == {"diarization": "SKIPPED", "punctuation": "SKIPPED"}
+    assert result["warnings"]["diarization"] == "no diarisation worker available"
     alt = result["responses"][0]
     assert alt["transcript"] == "ab cd"
     assert [w["word"] for w in alt["words"]] == ["ab", "cd"]
     assert set(alt["words"][0]) == {"word", "start", "end", "confidence"}
     assert store.load_audio(r["jobid"]) is None
+
+
+def test_stages_can_be_declined(client, store):
+    r = client.post("/audio/asr/fi/submit_file?nosplit=true&diarize=false&punctuate=false",
+                    data={"file": (io.BytesIO(wav_bytes(1.0)), "x.wav")}, content_type="multipart/form-data").get_json()
+    run_worker(store, 1)
+    result = client.post("/audio/asr/fi/query_job", data=r["jobid"]).get_json()
+    assert set(result) == {"status", "processing_started", "processing_finished", "responses", "type"}
+    r = client.post("/audio/asr/fi/submit?num_speakers=0", data=wav_bytes(1.0)).get_json()
+    assert r == {"error": "num_speakers must be a positive integer"}
+
+
+def test_single_job_with_stages(client, store):
+    store.heartbeat("diarize", "d1")
+    store.heartbeat("punctuate", "p1")
+    r = client.post("/audio/asr/fi/submit?num_speakers=2", data=wav_bytes(3.0)).get_json()
+    job = store.get_job(r["jobid"])
+    assert store.get_job(job["diarize_job"])["num_speakers"] == "2"
+    assert store.queue_length("diarize") == 1 and store.queue_length("punctuate") == 0
+    run_worker(store, 1)
+    # Recognition is done but the job waits for its stages.
+    result = client.post("/audio/asr/fi/query_job", data=r["jobid"]).get_json()
+    assert result["status"] == "pending" and result["responses"][0]["transcript"] == "ab cd"
+    assert result["checks"] == {"diarization": "PENDING", "punctuation": "PENDING"}
+    run_worker(store, 1, worker.DiarizationHandler(FakeDiarizer()))
+    assert store.queue_length("punctuate") == 1
+    run_worker(store, 1, worker.PunctuationHandler(RulesPunctuator()))
+    result = client.post("/audio/asr/fi/query_job", data=r["jobid"]).get_json()
+    assert result["status"] == "done" and result["checks"] == {"diarization": "UP", "punctuation": "UP"}
+    assert result["diarization"]["speakers"] == ["S0", "S1"]
+    words = result["responses"][0]["words"]
+    assert [w["speaker"] for w in words] == ["S0", "S0"]
+    assert [w["word_with_punctuation"] for w in words] == ["Ab", "cd."]
+    assert result["responses"][0]["transcript_punctuated"] == "Ab cd."
+    assert result["responses"][0]["transcript"] == "ab cd"
+
+
+def test_split_job_with_stages(client, store):
+    store.heartbeat("diarize", "d1")
+    store.heartbeat("punctuate", "p1")
+    tone = (np.sin(np.arange(16000 * 5) * 0.1) * 8000).astype("<i2").tobytes()
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)
+        w.writeframes(tone + b"\0\0" * 16000 * 2 + tone)
+    r = client.post("/audio/asr/fi/submit_file", data={"file": (io.BytesIO(buf.getvalue()), "x.wav")},
+                    content_type="multipart/form-data").get_json()
+    for t in threading.enumerate():
+        if t is not threading.current_thread():
+            t.join(10)
+    run_worker(store, 2)
+    assert client.post("/audio/asr/fi/query_job", data=r["jobid"]).get_json() == {"status": "pending"}
+    run_stage_workers(store)
+    result = client.post("/audio/asr/fi/query_job", data=r["jobid"]).get_json()
+    assert result["status"] == "done"
+    first, second = result["segments"]
+    assert [w["speaker"] for w in first["responses"][0]["words"]] == ["S0", "S0"]
+    assert [w["speaker"] for w in second["responses"][0]["words"]] == ["S1", "S1"]
+    assert first["responses"][0]["transcript_punctuated"] == "Ab cd."
+    tk = client.post("/audio/asr/fi/query_job/tekstiks", data=r["jobid"]).get_json()
+    assert tk["done"] and tk["result"]["speakers"] == {"S0": {}, "S1": {}}
+    sections = tk["result"]["sections"]
+    assert [s["type"] for s in sections] == ["speech", "speech"]
+    assert [t["speaker"] for s in sections for t in s["turns"]] == ["S0", "S1"]
+    turn = sections[1]["turns"][0]
+    assert turn["transcript"] == "Ab cd." and turn["start"] == sections[1]["start"] + second["responses"][0]["words"][0]["start"]
+    assert set(turn["words"][0]) == {"word", "start", "end", "confidence", "speaker", "word_with_punctuation", "punctuation"}
+    assert "words" not in sections[1] and sections[1]["start"] <= turn["words"][0]["start"]
+
+
+def test_query_recovers_a_missed_punctuation_trigger(client, store):
+    store.heartbeat("punctuate", "p1")
+    r = client.post("/audio/asr/fi/submit?diarize=false", data=wav_bytes(1.0)).get_json()
+    # A worker that finishes the job but dies before settling it.
+    w = worker.Worker(store, worker.RecognitionHandler(FakeRecognizer(), "fi"), name="dying")
+    w.start()
+    raw, message = store.claim("fi", "dying")
+    w.handle(message)
+    store.release("fi", "dying", raw)
+    assert store.queue_length("punctuate") == 0
+    result = client.post("/audio/asr/fi/query_job", data=r["jobid"]).get_json()
+    assert result["status"] == "pending" and store.queue_length("punctuate") == 1
+    run_worker(store, 1, worker.PunctuationHandler(RulesPunctuator()))
+    assert client.post("/audio/asr/fi/query_job", data=r["jobid"]).get_json()["status"] == "done"
+
+
+def test_job_that_keeps_killing_workers_fails(client, store):
+    r = client.post("/audio/asr/fi/submit?diarize=false&punctuate=false", data=wav_bytes(1.0)).get_json()
+    # Two workers claim the job and die before finishing it.
+    for name in ("w1", "w2"):
+        store.claim("fi", name)
+        store.count_attempt(r["jobid"])
+        store.requeue_processing("fi", name)
+    run_worker(store, 1)
+    result = client.post("/audio/asr/fi/query_job", data=r["jobid"]).get_json()
+    assert result["status"] == "failed" and result["error"] == "processing failed repeatedly"
+
+
+def test_stage_failure_degrades(client, store):
+    store.heartbeat("diarize", "d1")
+    r = client.post("/audio/asr/fi/submit?punctuate=false", data=wav_bytes(1.0)).get_json()
+    run_worker(store, 1)
+
+    class Broken:
+        description = {}
+
+        def turns(self, *args):
+            raise RuntimeError("boom")
+
+    run_worker(store, 1, worker.DiarizationHandler(Broken()))
+    result = client.post("/audio/asr/fi/query_job", data=r["jobid"]).get_json()
+    assert result["status"] == "done" and result["checks"] == {"diarization": "DOWN"}
+    assert result["warnings"] == {"diarization": "internal error while processing"}
+    assert "speaker" not in result["responses"][0]["words"][0]
 
 
 def test_submit_file_split_segments_and_tekstiks(client, store):
@@ -127,12 +266,21 @@ def test_submit_file_split_segments_and_tekstiks(client, store):
     assert second["start"] == first["stop"]
     assert second["duration"] == second["stop"]
     assert set(first) >= {"responses", "status", "processing_started", "processing_finished", "start", "stop", "duration"}
+    assert first["type"] == "speech"
     tk = client.post("/audio/asr/fi/query_job/tekstiks", data=r["jobid"]).get_json()
     assert tk["done"] is True and tk["status"] == "done"
     assert tk["metadata"] == {"version": "KP 0.1"}
     assert tk["result"]["speakers"] == {"S0": {}}
     assert [s["transcript"] for s in tk["result"]["sections"]] == ["ab cd", "ab cd"]
     assert tk["result"]["sections"][1]["start"] == first["stop"]
+    assert [t["speaker"] for s in tk["result"]["sections"] for t in s["turns"]] == ["S0", "S0"]
+    # A segment in which nothing was recognised is reported as non-speech.
+    child = segments[1]["jobid"]
+    store.set_field(child, "response", json.dumps({"responses": [{"transcript": "", "confidence": 0.0, "words": []}]}))
+    tk = client.post("/audio/asr/fi/query_job/tekstiks", data=r["jobid"]).get_json()
+    assert tk["result"]["sections"][1] == {"type": "non-speech", "start": first["stop"], "end": second["stop"]}
+    result = client.post("/audio/asr/fi/query_job", data=r["jobid"]).get_json()
+    assert [s["type"] for s in result["segments"]] == ["speech", "non-speech"]
 
 
 def test_raw_submit_and_sync(client, store):
@@ -228,7 +376,7 @@ def test_requeue_from_vanished_worker(store):
     store.enqueue("fi", "job1", "asr")
     store.claim("fi", "dead-worker")
     assert store.queue_length("fi") == 0
-    w = worker.Worker(store, FakeRecognizer(), lang="fi", name="live-worker")
+    w = worker.Worker(store, worker.RecognitionHandler(FakeRecognizer(), "fi"), name="live-worker")
     w.start()
     assert store.queue_length("fi") == 1
     # A worker that is still alive keeps its claims.

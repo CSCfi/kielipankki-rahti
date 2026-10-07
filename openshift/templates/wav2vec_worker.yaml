@@ -4,24 +4,28 @@ metadata:
   name: wav2vec-worker-template
   annotations:
     description: >-
-      Recognition and alignment worker for one language, running the wav2vec
-      image with ROLE=worker. An init container downloads the model zip from
-      MODEL_URL into an emptyDir; the worker loads it once and consumes the
-      Redis list asr:<LANG>.
+      A queue worker running the wav2vec image: with ROLE=worker the
+      recognition and alignment worker of one language, consuming the Redis
+      list asr:<LANG>; with ROLE=diarize or ROLE=punctuate the shared stage
+      worker of that name. An init container downloads the model zip from
+      MODEL_URL into an emptyDir and the worker loads it once.
 parameters:
   - name: IMAGE_NAMESPACE
     description: Project whose image registry holds the wav2vec and init_container images
     value: kielipankki-services
   - name: IMAGE_TAG
     value: latest
+  - name: ROLE
+    description: worker, diarize or punctuate
+    value: worker
   - name: LANG
-    description: Language code as it appears in the public paths and the queue name
-    required: true
+    description: Language code as it appears in the public paths and the queue name; unused by the stage workers
+    value: fi
   - name: NAME
     description: Deployment name; must be lowercase, so codes such as sv-FI need it set explicitly
     value: wav2vec-fi
   - name: MODEL_URL
-    description: Public URL of a zip holding a Hugging Face model directory
+    description: Public URL of a zip holding the model directory (see tools/)
     required: true
   - name: REPLICAS
     value: "1"
@@ -40,7 +44,7 @@ parameters:
     description: Torch threads, normally equal to CPU_LIMIT
     value: "4"
   - name: QUANTIZE
-    description: none or int8
+    description: none or int8; the diarisation worker ignores it
     value: int8
 
 objects:
@@ -96,7 +100,7 @@ objects:
               image: image-registry.apps.2.rahti.csc.fi/${IMAGE_NAMESPACE}/wav2vec:${IMAGE_TAG}
               env:
                 - name: ROLE
-                  value: worker
+                  value: ${ROLE}
                 - name: ASR_LANG
                   value: ${LANG}
                 - name: ASR_MODEL_DIR

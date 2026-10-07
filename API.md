@@ -56,9 +56,17 @@ The following endpoints, intended to support slightly larger jobs that may time 
 
 Endpoints for automatic speech recognition.
 
+The paths below are for Finnish; `/audio/asr/sme/...` and `/audio/asr/sv-FI/...` serve Northern Sámi and Finland Swedish in the same way.
+
 #### `/audio/asr/fi/submit_file` (POST)
 
 Submit a form with a `file` key, eg. `curl -F 'file=@audio.mp3' http://kielipankki.rahtiapp.fi/audio/asr/fi/submit_file`. The response is a json object containing a `jobid` key, which is used later for polling for results with `/audio/asr/fi/query_job`.
+
+Optional parameters, as query string or form fields, accepted by every submission endpoint:
+
+* `nosplit=true` recognises the file as one segment instead of splitting it on silence.
+* `diarize=false` turns off speaker diarisation, `punctuate=false` turns off punctuation and truecasing. Both are on by default.
+* `num_speakers=N` fixes the number of speakers for diarisation; by default it is detected.
   
 Example output:
   
@@ -92,11 +100,21 @@ In this case the job is known, but there is no result to report yet, partial or 
 
 `{'status': 'pending'}`
 
+##### Complete result
+
+A `status` of `done` with the recognised `segments`, each holding `responses` with a `transcript`, a `confidence` and timed `words`, plus the `model` that was used. Word times are relative to the segment, segment `start` and `stop` to the file. A segment's `type` is `speech` when words were recognised in it and `non-speech` otherwise; a job submitted without splitting carries the same key at the top level.
+
+When diarisation ran, every word has a `speaker` label (`S0`, `S1`, ...) and the result has `diarization` with the `speakers` and the speaker `turns` as `start`, `end` and `speaker`. Words take the turn they overlap most; the segments themselves come from the silence splitting and can contain several speakers. When punctuation ran, every word has `word_with_punctuation` (cased, with any attached punctuation) and `punctuation` (the marks following the word, possibly empty), and every alternative has `transcript_punctuated` next to the raw `transcript`.
+
+`checks` reports each requested stage as `UP`, `DOWN` (it failed; the job is still done, without that output) or `SKIPPED` (no worker for it was running), and `warnings` gives the reason for anything not `UP`. The job stays `pending` until its stages have finished.
+
 #### `/audio/asr/fi/query_job/tekstiks`
 
 This is a specialised endpoint that conforms to a particular front-end.
 
 Submit a jobid as the data payload. The response may be a partial result, a complete result, a pending result, or an error state.
+
+The `result` holds `speakers` (one key per label) and `sections`, one per segment of the audio, with `type`, `start` and `end`. A section in which words were recognised has `type: "speech"`, the raw `transcript` and `turns`; one without is `type: "non-speech"` and has nothing else. A turn is one speaker's stretch of speech within the section: `speaker`, `start`, `end`, `transcript` (punctuated when punctuation ran) and `words`, with times relative to the file as in the format of the Estonian ASR pipeline.
 
 ### Forced alignment
 
@@ -122,7 +140,7 @@ These should all return a `200` code when healthy in less than one second. With 
 
 Example:
 
-`{"checks":{"redis":"UP"},"status":"UP"}`
+`{"checks":{"redis":"UP","workers":"UP"},"queue_length":0,"workers":1,"stages":{"diarize":{"workers":1,"queue_length":0},"punctuate":{"workers":1,"queue_length":0}},"status":"UP"}`
 
 The following endpoints perform more thorough tests of their functioning. These tests should not be called too frequently (eg. once a day is ok, or more often if the service has recently failed).
 
@@ -133,5 +151,5 @@ Example:
 
 ```bash
 $ curl kielipankki.rahtiapp.fi/audio/asr/fi/self_test
-{"checks":{"decoding":"UP","query_response":"UP","redis":"UP","submit_file":"UP"},"status":"UP"}
+{"checks":{"align":"UP","decoding":"UP","diarization":"UP","punctuation":"UP","query_response":"UP","redis":"UP","submit_file":"UP","workers":"UP"},"status":"UP"}
 ```
